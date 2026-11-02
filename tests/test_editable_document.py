@@ -1,4 +1,4 @@
-"""v1.1.6: editable text should not depend on stored plaintext offsets."""
+"""v2.0.0: editable text does not depend on stored plaintext offsets."""
 import base64
 import json
 import re
@@ -142,6 +142,6 @@ def test_actual_191_guide_import_roundtrip_when_available():
 
 def test_ui_assets_and_api_format_exist():
     assert 'id="downloadEditable"' in client.get('/').text
-    assert client.get('/assets/app-v1.1.6.js').status_code == 200
-    assert client.get('/assets/encrypt-v1.1.6.js').status_code == 200
+    assert client.get('/assets/app-v2.0.0.js').status_code == 200
+    assert client.get('/assets/encrypt-v2.0.0.js').status_code == 200
     assert 'Editable guide TXT' in client.get('/encrypt').text

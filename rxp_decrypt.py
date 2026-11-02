@@ -168,11 +168,8 @@ def decode_chunk(chunk: Chunk, initial_state: list[int], max_output_bytes: int) 
     return plain
 
 
-def guide_filename(guide: bytes, number: int) -> str:
-    """Make a Windows-safe filename from pre-step #group/#name headers.
-
-    Filename formatting never alters the bytes written to the actual file.
-    """
+def guide_label(guide: bytes, number: int) -> str:
+    """Show a short, safe display label for each guide in the UI preview."""
     group = name = None
     header = guide.decode("utf-8", errors="replace")
     for line in header.splitlines():
@@ -196,100 +193,34 @@ def guide_filename(guide: bytes, number: int) -> str:
 
     labels = [safe(value) for value in (group, name) if value]
     labels = [label for label in labels if label]
-    # Numeric prefix avoids collisions even if different guides have identical names.
     suffix = " - ".join(labels) if labels else "Guide"
-    return f"guide_{number:03d} - {suffix}.txt"
+    return f"{number:03d} · {suffix}"
 
-
-def write_guides(guides: list[bytes], directory: Path) -> list[Path]:
-    """Create separate files without deleting unrelated/previous user files."""
-    directory.mkdir(parents=True, exist_ok=True)
-    paths = []
-    for number, guide in enumerate(guides, start=1):
-        path = directory / guide_filename(guide, number)
-        path.write_bytes(guide)
-        paths.append(path)
-    return paths
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Decode a GuideLoader.lua account-keyed encrypted import."
-    )
-    source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--payload", help="Full import string, single chunk, or Base64")
-    source.add_argument("--payload-file", type=Path, help="Read encoded payload from a text file")
-    parser.add_argument("--id", dest="account_id", help="Exact account ID/BattleTag returned by WoW")
-    parser.add_argument("--checksum", type=int, help="Decimal Adler-32 checksum for raw Base64 input")
-    parser.add_argument("--output", type=Path,
-                        help="Save a single guide to this file; multiple guides are automatically split")
-    parser.add_argument("--split-dir", type=Path,
-                        help="Custom directory for separate guides (also writes a single guide there)")
-    parser.add_argument("--max-output-mib", type=int, default=128,
-                        help="Maximum decompressed bytes per chunk in MiB (default: 128)")
+    """Optional CLI entry point: export one editable TXT, same as the WebUI."""
+    parser = argparse.ArgumentParser(description='Decrypt a full native RXP import to Editable guide TXT.')
+    parser.add_argument('--payload-file', required=True, type=Path, help='Original encrypted import text file')
+    parser.add_argument('--id', dest='account_id', help='Original account ID (prompted if omitted)')
+    parser.add_argument('--output', type=Path, default=Path('editable_guides.txt'),
+                        help='Path for the self-contained editable TXT')
     args = parser.parse_args()
-
     try:
-        if args.max_output_mib <= 0:
-            raise DecodeError("--max-output-mib must be greater than zero")
-        account_id = args.account_id
-        if account_id is None:
-            account_id = getpass.getpass("Account ID (not echoed): ")
-        if not account_id:
-            raise DecodeError("An account ID is required")
-
-        text = (args.payload_file.read_text(encoding="utf-8-sig")
-                if args.payload_file is not None else args.payload)
-        chunks = extract_chunks(text, args.checksum)
-        initial_state = initial_permutation(derive_base(account_id))
-
-        decoded = []
-        for number, chunk in enumerate(chunks, start=1):
-            try:
-                decoded.append(decode_chunk(chunk, initial_state,
-                                            args.max_output_mib * 1024 * 1024))
-            except DecodeError as exc:
-                raise DecodeError(f"Chunk {number}/{len(chunks)}: {exc}") from exc
-
-        # Lua loads all nonempty spans separated by NUL as distinct guides.
-        guides = [guide for item in decoded for guide in item.split(b"\x00") if guide]
-        if not guides:
-            raise DecodeError("Decryption produced no guide data")
-
-        if len(guides) > 1:
-            # Match the addon's behaviour: every nonempty NUL-separated span is
-            # an independent guide, even when it came from another chunk.
-            split_dir = args.split_dir or (
-                (args.output.parent if args.output else Path.cwd()) / "decrypted_guides"
-            )
-            paths = write_guides(guides, split_dir)
-            print(f"Detected {len(guides)} guides; wrote separate files to {split_dir}:",
-                  file=sys.stderr)
-            for path in paths:
-                print(f"  {path.name}", file=sys.stderr)
-            if args.output and args.output.exists():
-                print(f"Note: existing combined/previous file {args.output} was not modified.",
-                      file=sys.stderr)
-        else:
-            if args.output:
-                args.output.parent.mkdir(parents=True, exist_ok=True)
-                args.output.write_bytes(guides[0])
-                print(f"Saved single guide to {args.output}", file=sys.stderr)
-            if args.split_dir:
-                paths = write_guides(guides, args.split_dir)
-                print(f"Saved single guide to {paths[0]}", file=sys.stderr)
-            if not args.output and not args.split_dir:
-                sys.stdout.buffer.write(guides[0])
-                if not guides[0].endswith(b"\n"):
-                    sys.stdout.buffer.write(b"\n")
-
-        print(f"Success: {len(chunks)} encrypted chunk(s), {len(guides)} guide(s)",
-              file=sys.stderr)
+        from webapp.editable_document import make_editable_document
+        account = args.account_id or getpass.getpass('Account ID (not echoed): ')
+        if not account:
+            raise DecodeError('An account ID is required')
+        payload = args.payload_file.read_text(encoding='utf-8-sig')
+        editable, count, chunks = make_editable_document(payload, account)
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_bytes(editable)
+        print(f'Saved {count} guides from {chunks} chunk(s) to {args.output}', file=sys.stderr)
         return 0
-    except (DecodeError, OSError, UnicodeError) as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+    except (DecodeError, ValueError, OSError, UnicodeError) as exc:
+        print(f'Error: {exc}', file=sys.stderr)
         return 1
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     sys.exit(main())

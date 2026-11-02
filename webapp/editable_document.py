@@ -13,9 +13,28 @@ import re
 import zlib
 
 from rxp_decrypt import CHUNK_RE, decode_chunk, derive_base, extract_chunks, initial_permutation, xor_stream
-from webapp.import_bundle import original_framing
 
 MAGIC = b'#!RXPTOOL/1\n'
+
+
+def original_framing(payload: str) -> dict:
+    """Identify original native import framing without byte-offset manifests."""
+    matches = list(CHUNK_RE.finditer(payload))
+    if not matches:
+        raise DocumentError('Could not find a native encrypted chunk')
+    header = payload[:matches[0].start()]
+    footer = payload[matches[-1].end():]
+    between = [payload[left.end():right.start()] for left, right in zip(matches, matches[1:])]
+    if max(map(len, [header, footer, *between]), default=0) > MAX_FRAMING:
+        raise DocumentError('Import framing is too large')
+    count_match = re.search(r'(\d+)\|$', header)
+    version_match = re.match(r'^\|(\d+)', footer)
+    return {
+        'input_kind': 'framed-import' if count_match and version_match else 'chunk-data',
+        'header': {'raw': header if header else None},
+        'footer': {'raw': footer if footer else None},
+        'inter_chunk_text': between,
+    }
 
 
 def is_editable_document(data: bytes) -> bool:
@@ -128,6 +147,10 @@ def rebuild_from_editable_document(document: bytes, account_id: str) -> tuple[st
     header = read_setting(b'#!header=')
     footer = read_setting(b'#!footer=')
     fingerprint = read_setting(b'#!account_key_fingerprint=')
+    if (not isinstance(fingerprint, str) or
+            not re.fullmatch(r'[0-9a-f]{64}', fingerprint) or
+            fingerprint != hashlib.sha256(derive_base(account_id)).hexdigest()):
+        raise DocumentError('ID does not match the original document account; same-account reconstruction only')
     if not isinstance(header, str) or not re.fullmatch(r'\D*\d+\|', header) or not isinstance(footer, str) or not re.fullmatch(r'\|\d+\D*', footer):
         raise DocumentError('The stored import header/footer is not valid')
     between = []

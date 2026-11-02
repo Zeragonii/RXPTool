@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="referrer" content="no-referrer" />
   <meta name="theme-color" content="#0a1020" />
-  <title>Encrypt · RXPTool</title>
+  <title>RXPTool · Encrypt guides</title>
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/assets/app-v1.1.6.css" />
-  <script src="/assets/encrypt-v1.1.6.js" defer></script>
+  <link rel="stylesheet" href="/assets/app-v2.0.0.css" />
+  <script src="/assets/encrypt-v2.0.0.js" defer></script>
 </head>
 <body>
   <div class="ambient ambient-a" aria-hidden="true"></div>
@@ -29,15 +29,15 @@
     </header>
     <main>
       <section class="hero" aria-labelledby="title">
-        <div class="eyebrow"><span class="eyebrow-line"></span> REVERSE THE DECRYPTION PIPELINE.</div>
-        <h1 id="title">Guides, <span>encrypted<br class="hero-break" /> and reversible.</span></h1>
-        <p>Upload a self-contained Editable guide TXT from Decrypt, edit it freely, and rebuild using your original ID. No separate manifest needed.</p>
+        <div class="eyebrow"><span class="eyebrow-line"></span> EDIT. REBUILD. VERIFY.</div>
+        <h1 id="title"><span>{{RXP_HEADLINE}}</span></h1>
+        <p>Re-encrypt your edited guide document into a full import string. All guide boundaries and checksums are rebuilt automatically.</p>
         <div class="hero-points"><span><i aria-hidden="true">✓</i> Matching account-derived cipher</span><span><i aria-hidden="true">✓</i> Direct Decrypt compatibility</span><span><i aria-hidden="true">✓</i> No server-side history</span></div>
       </section>
-      <div class="notice-bar" role="note"><strong>Choose how to process</strong><span>The recommended path: decrypt an import, download Editable guide TXT, edit any steps, then upload that one file here with the original ID. Guide boundaries travel with the text; no layout or browser session required. Older combined-TXT imports and metadata archives still support their existing options. The rebuilt payload is created from fresh ciphertext; it does not reuse saved encrypted bytes. Regular TXT/ZIP imports and exact archive restoration remain available.</span></div>
+      <div class="notice-bar" role="note"><strong>One format. Two steps.</strong><span>Decrypt an import to <code>editable_guides.txt</code>, edit it, then upload the same file here using the original account ID. All boundaries travel with the file — no extra downloads.</span></div>
       <div class="main-grid">
         <section class="panel form-panel" aria-labelledby="form-title">
-          <div class="panel-top"><div><span class="overline">ENCRYPT WORKSPACE</span><h2 id="form-title">Create a package</h2></div><span class="step-counter">01 / 02</span></div>
+          <div class="panel-top"><div><span class="overline">ENCRYPT WORKSPACE</span><h2 id="form-title">Rebuild an import</h2></div><span class="step-counter">01 / 02</span></div>
           <form id="encryptForm" novalidate>
             <div class="field-label"><span class="field-number">01</span><label for="encryptId">Battle.net ID</label><span class="required">REQUIRED</span></div>
             <div class="id-field">
@@ -48,48 +48,33 @@
             <p id="encryptIdHint" class="field-hint">Use the same ID on the Decrypt page to recover the plaintext. Case is ignored.</p>
             <label class="remember"><input id="rememberEncryptId" type="checkbox" /><span class="checkmark" aria-hidden="true"></span><span>Remember this ID on this device <small>Stored only in this browser, not on the server</small></span></label>
             <div class="soft-rule"></div>
-            <div class="field-label"><span class="field-number">02</span><span>Editable guide TXT or legacy file</span><span class="required">REQUIRED</span></div>
-            <input id="encryptFile" type="file" accept=".txt,.zip,.bin,.dat,.lua,text/plain,application/zip" hidden />
+            <div class="field-label"><span class="field-number">02</span><span>Editable guide TXT</span><span class="required">REQUIRED</span></div>
+            <input id="encryptFile" type="file" accept=".txt,text/plain" hidden />
             <div id="encryptDrop" class="dropzone" tabindex="0" role="button" aria-label="Choose or drop a plaintext guide file">
               <div class="drop-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 16V3m0 0L7.5 7.5M12 3l4.5 4.5M4.5 16v3A2.5 2.5 0 0 0 7 21h10a2.5 2.5 0 0 0 2.5-2.5v-3" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
               <strong id="encryptFileTitle">Drop editable_guides.txt here</strong>
-              <p id="encryptFileDescription">or <span class="browse-link">browse your files</span> · Editable TXT recommended, legacy TXT/ZIP supported</p>
-              <small>TXT / ZIP / raw guide files · Maximum 16 MiB</small>
+              <p id="encryptFileDescription">or <span class="browse-link">browse your files</span> · Self-contained editable document</p>
+              <small>Editable TXT only · Maximum 16 MiB</small>
             </div>
             <button id="clearEncryptFile" class="clear-file" type="button" hidden>Remove selected file</button>
             <div class="soft-rule"></div>
-            <div class="field-label"><span class="field-number">03</span><label for="encryptManifest">Legacy layout (optional)</label><span class="required">OPTIONAL</span></div>
-            <p class="field-hint">Not needed for Editable guide TXT. Older combined TXT exports may still use a manually selected <code>layout.json</code>.</p>
-            <input id="encryptManifest" type="file" accept=".json,application/json" class="recovery-file-input" />
-            <p id="manifestFileLabel" class="field-hint">No layout needed for Editable guide TXT. Upload JSON only for legacy combined TXT.</p>
             <div id="encryptError" class="error-box" role="alert" hidden></div>
             <button id="encryptSubmit" type="submit" class="primary-btn"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span id="encryptSubmitLabel">Encrypt guides</span><svg class="button-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12 14 0m0 0-6-6m6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-            <p class="submit-note">Editable guide TXT: a full framed import is freshly built using live guide markers, with checksums recalculated. The matching original ID is required. Raw legacy TXT/ZIP without layout creates a standalone chunk.</p>
+            <p class="submit-note">Only RXPTool editable TXT files are accepted. Import framing, separator positions and checksums are recalculated. The original matching ID is required.</p>
           </form>
         </section>
-        <aside class="sidebar" aria-label="Output and recovery">
+        <aside class="sidebar" aria-label="Output and information">
           <section class="panel output-panel" aria-labelledby="outputTitle">
             <div class="panel-top"><div><span class="overline">OUTPUT</span><h2 id="outputTitle">Encoded guide payload</h2></div><span class="step-counter">02 / 02</span></div>
-            <div id="encryptEmpty" class="empty-state"><div class="empty-illustration" aria-hidden="true"><svg viewBox="0 0 92 92" fill="none"><rect x="18" y="15" width="56" height="65" rx="11" stroke="currentColor" stroke-width="2"/><path d="M32 38h28m-28 10h25" stroke="currentColor" stroke-width="2"/><rect x="54" y="54" width="28" height="25" rx="6" fill="#101d30" stroke="#5EEAD4" stroke-width="2.5"/><path d="M61 54v-7a7 7 0 0 1 14 0v7" stroke="#5EEAD4" stroke-width="2.5"/></svg></div><strong>Ready to encrypt</strong><p>Your encoded import or restored original payload will appear here when processing finishes.</p></div>
-            <div id="encryptLoading" class="loading-state" hidden><div class="spinner"></div><strong>Processing guides…</strong><p>Validating the archive or encrypting and verifying with the main decoder.</p></div>
-            <div id="encryptResult" hidden><div class="success-heading"><div class="success-icon">✓</div><div><strong id="encryptSuccessTitle">Round-trip verified</strong><span id="encryptSuccessSubtitle">Compatible with the Decrypt page</span></div></div><div class="stats"><div><span>INPUT</span><strong id="encryptInputSize">—</strong></div><div><span>PAYLOAD</span><strong id="encryptOutputSize">—</strong></div><div><span>GUIDES</span><strong id="encryptGuideCount">—</strong></div></div><p class="field-hint" id="encryptResultHint">On the Decrypt page, upload this .txt payload and enter the same ID. Individual guides and their contents will be recovered; combined separators are canonicalised.</p><button id="downloadEncrypted" type="button" class="download-btn"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 17v3h16v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg> Download encrypted payload</button></div>
-          </section>
-          <section class="panel recovery-panel" aria-labelledby="recoveryTitle">
-            <div class="panel-top"><div><span class="overline">LEGACY RECOVERY</span><h2 id="recoveryTitle">Open a v1.1.0 package</h2></div></div>
-            <p class="recover-lead">Have an older <code>.rxptool</code> AES file created by v1.1.0? Recover it here. New .txt exports are decrypted from the main Decrypt tab.</p>
-            <form id="recoveryForm" novalidate>
-              <label class="recovery-file-label" for="recoverFile">Encrypted file <span>(.rxptool)</span></label>
-              <input id="recoverFile" type="file" accept=".rxptool" class="recovery-file-input" />
-              <div id="recoverError" role="alert" class="error-box" hidden></div>
-              <button id="recoverSubmit" type="submit" class="download-btn download-btn-secondary">Open &amp; download original</button>
-            </form>
-            <p id="recoverStatus" class="field-hint" role="status" aria-live="polite"></p>
+            <div id="encryptEmpty" class="empty-state"><div class="empty-illustration" aria-hidden="true"><svg viewBox="0 0 92 92" fill="none"><rect x="18" y="15" width="56" height="65" rx="11" stroke="currentColor" stroke-width="2"/><path d="M32 38h28m-28 10h25" stroke="currentColor" stroke-width="2"/><rect x="54" y="54" width="28" height="25" rx="6" fill="#101d30" stroke="#5EEAD4" stroke-width="2.5"/><path d="M61 54v-7a7 7 0 0 1 14 0v7" stroke="#5EEAD4" stroke-width="2.5"/></svg></div><strong>Ready to encrypt</strong><p>Your freshly rebuilt import will appear here when processing finishes.</p></div>
+            <div id="encryptLoading" class="loading-state" hidden><div class="spinner"></div><strong>Processing guides…</strong><p>Rebuilding all chunks and verifying the resulting import.</p></div>
+            <div id="encryptResult" hidden><div class="success-heading"><div class="success-icon">✓</div><div><strong id="encryptSuccessTitle">Import rebuilt and verified</strong><span id="encryptSuccessSubtitle">Freshly encrypted · full import framing</span></div></div><div class="stats"><div><span>INPUT</span><strong id="encryptInputSize">—</strong></div><div><span>PAYLOAD</span><strong id="encryptOutputSize">—</strong></div><div><span>GUIDES</span><strong id="encryptGuideCount">—</strong></div></div><p class="field-hint" id="encryptResultHint">The reconstructed plaintext was verified byte-for-byte by RXPTool after encryption.</p><button id="downloadEncrypted" type="button" class="download-btn"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 17v3h16v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg> Download encrypted payload</button></div>
           </section>
           <section class="privacy-panel"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Private by design <small>No files saved server-side. ID storage is opt-in.</small></span></section>
         </aside>
       </div>
     </main>
-    <footer><span>RXP Tool <span class="footer-sep">/</span> v1.1.6</span><span>Independent utility · Not affiliated with RestedXP</span></footer>
+    <footer><span>RXP Tool <span class="footer-sep">/</span> v2.0.0</span><span>Independent utility · Not affiliated with RestedXP</span></footer>
   </div>
 </body>
 </html>

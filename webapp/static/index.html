@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="referrer" content="no-referrer" />
   <meta name="theme-color" content="#0a1020" />
-  <title>RXP Decoder · Self-hosted guide utility</title>
+  <title>RXPTool · Decrypt guides</title>
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/assets/app-v1.1.6.css" />
-  <script src="/assets/app-v1.1.6.js" defer></script>
+  <link rel="stylesheet" href="/assets/app-v2.0.0.css" />
+  <script src="/assets/app-v2.0.0.js" defer></script>
 </head>
 <body>
   <div class="ambient ambient-a" aria-hidden="true"></div>
@@ -20,7 +20,7 @@
     <header class="topbar">
       <div class="brand">
         <img class="brand-icon" src="/assets/favicon.svg" width="47" height="47" alt="" aria-hidden="true" />
-        <span class="brand-label">RXP <strong>Decoder</strong><small>SELF-HOSTED UTILITY</small></span>
+        <span class="brand-label">RXP <strong>Tool</strong><small>SELF-HOSTED UTILITY</small></span>
       </div>
       <div class="header-actions"><nav class="site-nav" aria-label="Tools"><a class="nav-link active" href="/" aria-current="page">Decrypt</a><a class="nav-link" href="/encrypt">Encrypt</a></nav><span class="status"><span class="status-dot"></span> Self-hosted</span></div>
     </header>
@@ -28,9 +28,9 @@
     <main>
       <section class="hero" aria-labelledby="title">
         <div class="eyebrow"><span class="eyebrow-line"></span> YOUR PAYLOADS. YOUR SERVER.</div>
-        <h1 id="title">Guides, <span>unlocked<br class="hero-break" /> into plaintext.</span></h1>
-        <p>Upload an encrypted guide export, provide the account ID used to encrypt it, and recover clean guide files in one click.</p>
-        <div class="hero-points"><span><i aria-hidden="true">✓</i> Choose your download format</span><span><i aria-hidden="true">✓</i> TXT or split ZIP export</span><span><i aria-hidden="true">✓</i> No server-side history</span></div>
+        <h1 id="title"><span>{{RXP_HEADLINE}}</span></h1>
+        <p>Decrypt your original import into a single editable TXT. Change steps or guide metadata, then rebuild it from the Encrypt tab.</p>
+        <div class="hero-points"><span><i aria-hidden="true">✓</i> One editable TXT</span><span><i aria-hidden="true">✓</i> Round-trip verification</span><span><i aria-hidden="true">✓</i> No server-side history</span></div>
       </section>
 
       <div class="main-grid">
@@ -53,7 +53,7 @@
               <button id="tabPaste" type="button" role="tab" aria-selected="false" aria-controls="pastePanel" class="tab"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 4h10a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2ZM4 16H3V3a1 1 0 0 1 1-1h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg> Paste text</button>
             </div>
             <div id="uploadPanel" role="tabpanel" aria-labelledby="tabUpload">
-              <input id="payloadFile" type="file" accept=".txt,.rxp,.json,.dat,text/plain" hidden />
+              <input id="payloadFile" type="file" accept=".txt,.rxp,.dat,text/plain" hidden />
               <div id="dropZone" class="dropzone" role="button" tabindex="0" aria-label="Upload encrypted payload file">
                 <div class="drop-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 16V3m0 0L7.5 7.5M12 3l4.5 4.5M4.5 16v3A2.5 2.5 0 0 0 7 21.5h10a2.5 2.5 0 0 0 2.5-2.5v-3" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
                 <strong id="fileTitle">Drop an encrypted payload here</strong>
@@ -64,7 +64,7 @@
             </div>
             <div id="pastePanel" role="tabpanel" aria-labelledby="tabPaste" hidden>
               <textarea id="payloadText" placeholder="Paste the complete encrypted RXP import string here…" spellcheck="false" rows="7" aria-label="Encrypted payload"></textarea>
-              <p class="field-hint">Supports full import strings, individual chunks, or raw Base64.</p>
+              <p class="field-hint">Paste the full import string with its guide count and addon version.</p>
             </div>
             <div id="error" class="error-box" role="alert" hidden></div>
             <button id="submitBtn" type="submit" class="primary-btn"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m13 3-8 10h7l-1 8 8-11h-7l1-7Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span id="submitLabel">Decrypt payload</span><svg class="button-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12 14 0m0 0-6-6m6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -76,35 +76,26 @@
           <section class="panel output-panel" aria-labelledby="outputTitle">
             <div class="panel-top"><div><span class="overline">OUTPUT</span><h2 id="outputTitle">Decryption result</h2></div><span class="step-counter">02 / 02</span></div>
             <div id="emptyState" class="empty-state"><div class="empty-illustration" aria-hidden="true"><svg viewBox="0 0 92 92" fill="none"><rect x="17" y="11" width="58" height="70" rx="11" stroke="currentColor" stroke-width="2"/><path d="M30 32h32M30 43h23M30 54h29" stroke="currentColor" stroke-opacity=".65" stroke-width="3" stroke-linecap="round"/><circle cx="70" cy="70" r="17" fill="#101d30" stroke="#5EEAD4" stroke-width="2.5"/><path d="m63 70 5 5 10-11" stroke="#5EEAD4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div><strong>Ready when you are</strong><p>Your decrypted guides will appear here once processing completes.</p></div>
-            <div id="loadingState" class="loading-state" hidden><div class="spinner"></div><strong>Decrypting payload…</strong><p>Decoding, checking integrity and splitting guides.</p></div>
+            <div id="loadingState" class="loading-state" hidden><div class="spinner"></div><strong>Decrypting payload…</strong><p>Decoding, checking integrity and preparing your editable document.</p></div>
             <div id="resultState" hidden>
-              <div class="success-heading"><div class="success-icon">✓</div><div><strong>Decryption successful</strong><span>Guides are ready to download</span></div></div>
+              <div class="success-heading"><div class="success-icon">✓</div><div><strong>Decryption successful</strong><span>Your editable guide TXT is ready</span></div></div>
               <div class="stats"><div><span>GUIDES</span><strong id="guideCount">—</strong></div><div><span>CHUNKS</span><strong id="chunkCount">—</strong></div><div><span>OUTPUT</span><strong id="outputSize">—</strong></div></div>
-              <div class="result-label">RECOVERED FILES <span id="previewSuffix"></span></div>
+              <div class="result-label">GUIDE PREVIEW <span id="previewSuffix"></span></div>
               <ul id="filePreview" class="file-preview"></ul>
-              <div class="export-label">CHOOSE YOUR DOWNLOAD</div>
+              <div class="export-label">YOUR EDITABLE GUIDE DOCUMENT</div>
               <div class="export-actions">
-                <button id="downloadEditable" class="download-btn" type="button" aria-describedby="editableHint"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3h8l4 4v14H6V3Zm8 0v5h4M9 12h6M9 16h6" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>Editable guide TXT <small>Recommended · self-contained</small></span></button>
-                <button id="downloadCombined" class="download-btn download-btn-secondary" type="button" aria-describedby="combinedHint"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3h8l4 4v14H6V3Zm8 0v5h4M9 12h6M9 16h6" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>Combined plaintext <small>One .txt file</small></span></button>
-                <button id="downloadSplit" class="download-btn download-btn-secondary" type="button" aria-describedby="splitHint"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 8h16v12H4V8Zm4-4h8l2 4H6l2-4ZM8 12h8M8 16h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Separate guides <small>ZIP of .txt files</small></span></button>
-
-                <button id="downloadManifest" class="download-btn download-btn-secondary" type="button" aria-describedby="manifestHint"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.7"/></svg><span>Layout JSON <small>Headers, footer &amp; NUL byte offsets</small></span></button>
-                <button id="downloadBundle" class="download-btn download-btn-secondary" type="button" aria-describedby="bundleHint"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" stroke-width="1.7"/></svg><span>Download with metadata <small>Lossless import archive ZIP</small></span></button> 
+                <button id="downloadEditable" class="download-btn" type="button" aria-describedby="editableHint"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3h8l4 4v14H6V3Zm8 0v5h4M9 12h6M9 16h6" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>Editable guide TXT <small>Single export · fully editable</small></span></button>
               </div>
-              <p class="field-hint result-hint" id="editableHint">One editable file includes original header/footer and #!guide / #!empty markers. Edit steps freely, then upload this TXT on Encrypt. No manifest or fixed NUL offsets.</p>
-              <p class="field-hint result-hint" id="combinedHint">Legacy combined format: Combined file uses NUL separators between guides.</p>
-              <p id="splitHint" class="sr-only">Each guide is a separate text file inside one ZIP archive.</p>
-              <p id="manifestHint" class="field-hint result-hint">Separate readable JSON file: preserves original header/footer text, guide count and NUL slot positions (zero-based byte offsets).</p>
-              <p id="bundleHint" class="field-hint result-hint">Preserves the original import text, metadata, exact plaintext and chunk boundaries. Upload this ZIP to Encrypt with the original ID to restore the original import without changing any bytes.</p>
-              <p class="export-status" id="downloadStatus" role="status" aria-live="polite">Choose any format. No need to upload again.</p>
+              <p class="field-hint result-hint" id="editableHint">Includes guide markers, original framing and empty slots. Edit as plain text, then upload the same file on Encrypt.</p>
+              <p class="export-status" id="downloadStatus" role="status" aria-live="polite">Your editable TXT is ready to download.</p>
             </div>
           </section>
-          <section class="info-panel"><div class="info-icon">i</div><div><h3>How it works</h3><p>Uses the same account-derived cipher and zlib integrity checks as the Lua importer. Use Editable guide TXT for an all-in-one edit/re-encrypt workflow; legacy outputs remain available.</p></div></section>
+          <section class="info-panel"><div class="info-icon">i</div><div><h3>How it works</h3><p>Decrypt once to an editable TXT, make your changes and re-encrypt using the same account ID. Guide boundaries are preserved by markers, never fixed offsets.</p></div></section>
           <section class="privacy-panel"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Private by design <small>No uploads saved or logged. Browser ID storage is opt-in.</small></span></section>
         </aside>
       </div>
     </main>
-    <footer><span>RXP Tool <span class="footer-sep">/</span> v1.1.6</span><span>Independent utility · Not affiliated with RestedXP</span></footer>
+    <footer><span>RXP Tool <span class="footer-sep">/</span> v2.0.0</span><span>Independent utility · Not affiliated with RestedXP</span></footer>
   </div>
 </body>
 </html>

@@ -1,7 +1,7 @@
 services:
   rxp-decrypt:
     build: .
-    image: rxp-decrypt-web:1.0.0
+    image: rxptool:2.0.0
     container_name: rxp-decrypt
     restart: unless-stopped
     ports:
@@ -9,6 +9,7 @@ services:
     environment:
       RXP_USERNAME: ${RXP_USERNAME:-}
       RXP_PASSWORD: ${RXP_PASSWORD:-}
+      RXP_HEADLINE: ${RXP_HEADLINE:-Guides, unlocked into plaintext.}
     read_only: true
     tmpfs:
       - /tmp:size=32m,mode=1777
