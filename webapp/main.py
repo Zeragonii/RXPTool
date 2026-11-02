@@ -20,6 +20,7 @@ from webapp.package_crypto import PackageError, decrypt_package
 from webapp.import_bundle import BundleError, build_import_bundle, build_import_manifest, is_import_bundle, restore_original_import
 from webapp.native_encrypt import EncryptError, encrypt_payload, prepare_guides
 from webapp.manifest_rebuild import RebuildError, rebuild_from_manifest
+from webapp.editable_document import DocumentError, is_editable_document, make_editable_document, rebuild_from_editable_document
 from rxp_decrypt import (
     DecodeError,
     decode_chunk,
@@ -126,6 +127,12 @@ async def asset(asset: str):
         # by browser or reverse-proxy caches after a release.
         "app-v1.1.3.css": "text/css",
         "app-v1.1.4.css": "text/css",
+        "app-v1.1.5.css": "text/css",
+        "app-v1.1.6.css": "text/css",
+        "app-v1.1.6.js": "application/javascript",
+        "encrypt-v1.1.6.js": "application/javascript",
+        "app-v1.1.5.js": "application/javascript",
+        "encrypt-v1.1.5.js": "application/javascript",
         "encrypt-v1.1.3.js": "application/javascript",
         "encrypt-v1.1.4.js": "application/javascript",
         "app-v1.1.3.js": "application/javascript",
@@ -140,7 +147,7 @@ async def asset(asset: str):
         return failure(404, "Not found")
     # Both URLs serve the same canonical asset. Only the versioned URLs
     # are referenced by this release's HTML.
-    canonical = {"app-v1.1.3.css": "app.css", "app-v1.1.3.js": "app.js", "encrypt-v1.1.3.js": "encrypt.js", "app-v1.1.4.css": "app.css", "app-v1.1.4.js": "app.js", "encrypt-v1.1.4.js": "encrypt.js"}.get(asset, asset)
+    canonical = {"app-v1.1.3.css": "app.css", "app-v1.1.3.js": "app.js", "encrypt-v1.1.3.js": "encrypt.js", "app-v1.1.4.css": "app.css", "app-v1.1.4.js": "app.js", "encrypt-v1.1.4.js": "encrypt.js", "app-v1.1.5.css": "app.css", "app-v1.1.5.js": "app.js", "encrypt-v1.1.5.js": "encrypt.js", "app-v1.1.6.css": "app.css", "app-v1.1.6.js": "app.js", "encrypt-v1.1.6.js": "encrypt.js"}.get(asset, asset)
     return FileResponse(STATIC / canonical, media_type=media)
 
 
@@ -227,13 +234,21 @@ async def bounded_json(request: Request) -> Any:
 def process_input(account_id: str, payload: str, output_format: str):
     try:
         guides, chunks = decode_payload(account_id, payload)
+        if output_format == "editable":
+            doc, count, chunk_count = make_editable_document(payload, account_id)
+            return doc, "editable_guides.txt", "text/plain; charset=utf-8", {
+                "Content-Disposition": 'attachment; filename="editable_guides.txt"',
+                "X-Guide-Count": str(count),
+                "X-Chunk-Count": str(chunk_count),
+                "X-Output-Format": "editable",
+            }
         if output_format == "manifest":
             output = build_import_manifest(
                 payload, account_id, guides,
                 max_output_bytes=MAX_PLAINTEXT_BYTES, max_chunks=MAX_CHUNKS,
             )
-            return output, "manifest.json", "application/json", {
-                "Content-Disposition": 'attachment; filename="manifest.json"',
+            return output, "layout.json", "application/json", {
+                "Content-Disposition": 'attachment; filename="layout.json"',
                 "X-Guide-Count": str(len(guides)),
                 "X-Chunk-Count": str(chunks),
                 "X-Output-Format": "manifest",
@@ -269,8 +284,8 @@ async def decrypt(request: Request):
         return failure(400, "Expected a JSON object")
     account_id, payload = body.get("battle_id"), body.get("payload")
     output_format = body.get("format", "auto")
-    if output_format not in ("auto", "combined", "split", "bundle", "manifest"):
-        return failure(400, "Invalid export format; choose combined, split, manifest or bundle")
+    if output_format not in ("auto", "combined", "split", "bundle", "manifest", "editable"):
+        return failure(400, "Invalid export format; choose editable, combined, split, manifest or bundle")
     if not isinstance(account_id, str) or not account_id.strip():
         return failure(400, "Enter the Battle.net ID used by the addon")
     if not 1 <= len(account_id.encode("utf-8")) <= 256:
@@ -283,7 +298,7 @@ async def decrypt(request: Request):
         output, _filename, content_type, headers = await run_in_threadpool(
             process_input, account_id.strip(), payload, output_format
         )
-    except (DecodeError, BundleError) as exc:
+    except (DecodeError, BundleError, DocumentError) as exc:
         return failure(422, str(exc))
     except Exception:
         # Don't reflect sensitive inputs or stack traces to the UI.
@@ -320,6 +335,23 @@ def _validate_package_input(body: Any) -> tuple[str, bytes, str]:
 def _package_operation(action: str, account_id: str, data: bytes, filename: str):
     try:
         if action == "encrypt":
+            if is_editable_document(data):
+                rebuilt, count, n_chunks, expected_raw = rebuild_from_editable_document(data, account_id)
+                # Verify the *exact raw bytes*, not merely a normalized guide list.
+                chunks = extract_chunks(rebuilt, None)
+                permutation = initial_permutation(derive_base(account_id))
+                decoded_raw = [decode_chunk(chunk, permutation, MAX_PLAINTEXT_BYTES)
+                               for chunk in chunks]
+                if n_chunks != len(decoded_raw) or decoded_raw != expected_raw:
+                    raise DocumentError("Editable document raw-chunk verification failed")
+                guides, _ = decode_payload(account_id, rebuilt)
+                if len(guides) != count:
+                    raise DocumentError("Editable document guide count verification failed")
+                return rebuilt.encode("utf-8"), "rebuilt_import.txt", "text/plain; charset=utf-8", {
+                    "X-Package-Verified": "true", "X-Import-Rebuilt": "true",
+                    "X-Input-Bytes": str(len(data)),
+                    "X-Guide-Count": str(count), "X-Chunk-Count": str(n_chunks),
+                }
             # A metadata bundle from Decrypt can be restored *exactly*, but only
             # when both the original ID and all archived bytes still match.
             if filename.lower().endswith("rxptool_import_bundle.zip") or is_import_bundle(data):
@@ -363,7 +395,7 @@ async def _package_endpoint(request: Request, action: str):
         output, out_name, media, headers = await run_in_threadpool(
             _package_operation, action, account_id, data, filename
         )
-    except (PackageError, EncryptError, DecodeError, BundleError) as exc:
+    except (PackageError, EncryptError, DecodeError, BundleError, DocumentError) as exc:
         return failure(422, str(exc))
     except Exception:
         return failure(500, "Unexpected server error while handling package")
@@ -432,6 +464,6 @@ async def rebuild_api(request: Request):
         headers={
             "Content-Disposition": 'attachment; filename="rebuilt_import.txt"',
             "X-Guide-Count": str(count), "X-Chunk-Count": str(chunk_count),
-            "X-Import-Rebuilt": "true", "X-Source-Plaintext-Edited": str(edited).lower(),
+            "X-Import-Rebuilt": "true", "X-Source-Plaintext-Edited": str(edited).lower() if edited is not None else 'unknown',
         },
     )

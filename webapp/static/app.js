@@ -7,7 +7,7 @@
     'decryptForm', 'battleId', 'rememberId', 'payloadFile', 'payloadText',
     'error', 'submitBtn', 'submitLabel', 'dropZone', 'showId', 'tabUpload',
     'tabPaste', 'uploadPanel', 'pastePanel', 'clearFile', 'fileTitle',
-    'fileDescription', 'downloadCombined', 'downloadSplit', 'downloadManifest', 'downloadBundle', 'downloadStatus',
+    'fileDescription', 'downloadEditable', 'downloadCombined', 'downloadSplit', 'downloadManifest', 'downloadBundle', 'downloadStatus',
     'emptyState', 'resultState', 'loadingState', 'guideCount', 'chunkCount',
     'outputSize', 'previewSuffix', 'filePreview'
   ];
@@ -111,6 +111,7 @@
     byId('fileDescription').innerHTML = 'or <span class="browse-link">browse your files</span> to select a text export';
     setVisibility('clearFile', false);
   });
+  const editableBtn = byId('downloadEditable');
   const combinedBtn = byId('downloadCombined');
   const splitBtn = byId('downloadSplit');
   const bundleBtn = byId('downloadBundle');
@@ -141,6 +142,7 @@
   }
   const setExportBusy = (busy) => {
     exportBusy = busy;
+    editableBtn.disabled = busy;
     combinedBtn.disabled = busy;
     splitBtn.disabled = busy;
     bundleBtn.disabled = busy;
@@ -176,7 +178,7 @@
     const format = response.headers.get('X-Output-Format') || (count > 1 ? 'split' : 'combined');
     const disposition = response.headers.get('Content-Disposition') || '';
     const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ||
-      (format === 'manifest' ? 'manifest.json' : format === 'bundle' ? 'rxptool_import_bundle.zip' : format === 'split' ? 'decrypted_guides.zip' : 'decrypted_guides.txt');
+      (format === 'editable' ? 'editable_guides.txt' : format === 'manifest' ? 'layout.json' : format === 'bundle' ? 'rxptool_import_bundle.zip' : format === 'split' ? 'decrypted_guides.zip' : 'decrypted_guides.txt');
     return { response, blob, filename, format, count, chunks };
   }
   async function downloadFormat(format) {
@@ -185,7 +187,7 @@
     if (!item) {
       const epoch = requestEpoch;
       setExportBusy(true);
-      setExportStatus(format === 'manifest' ? 'Recording import framing and every NUL position…' : format === 'bundle' ? 'Preserving original import and metadata…' : format === 'combined' ? 'Preparing combined plaintext…' : 'Preparing split ZIP…');
+      setExportStatus(format === 'editable' ? 'Preparing self-contained editable TXT…' : format === 'manifest' ? 'Recording guide layout…' : format === 'bundle' ? 'Preserving original import and metadata…' : format === 'combined' ? 'Preparing combined plaintext…' : 'Preparing split ZIP…');
       try {
         const result = await fetchExport(lastInput, format);
         if (epoch !== requestEpoch) return; // Input changed while processing.
@@ -200,14 +202,16 @@
     }
     if (!item) return;
     saveBlob(item.blob, item.filename);
-    setExportStatus(format === 'manifest'
-      ? 'Downloaded manifest.json with raw header/footer text and zero-based NUL byte offsets.'
+    setExportStatus(format === 'editable' ? 'Downloaded editable_guides.txt. Edit steps and upload this file on Encrypt; no manifest needed.'
+      : format === 'manifest'
+      ? 'Downloaded layout.json (header, footer and NUL slot locations).'
       : format === 'bundle'
       ? 'Downloaded a lossless archive containing the original import, metadata and guides.'
       : format === 'combined'
       ? 'Downloaded one combined plaintext file.'
       : 'Downloaded a ZIP of individual guide files.');
   }
+  editableBtn.addEventListener('click', () => downloadFormat('editable'));
   combinedBtn.addEventListener('click', () => downloadFormat('combined'));
   splitBtn.addEventListener('click', () => downloadFormat('split'));
   bundleBtn.addEventListener('click', () => downloadFormat('bundle'));
@@ -257,7 +261,7 @@
         const li = document.createElement('li');
         li.append(docIcon(), document.createTextNode(name)); preview.append(li);
       }
-      setExportStatus('Choose plaintext, split files, standalone JSON manifest, or the lossless archive.');
+      setExportStatus('Choose Editable guide TXT to make edits without a manifest or fixed byte offsets.');
       setVisibility('loadingState', false);
       setVisibility('resultState', true);
     } catch (err) {

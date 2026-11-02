@@ -38,7 +38,7 @@
   } catch (_) { /* localStorage not available */ }
   manifestUpload.addEventListener('change', () => {
     const entry = manifestUpload.files?.[0];
-    byId('manifestFileLabel').textContent = entry ? `${entry.name} · Original import metadata selected` : 'No manifest selected — regular TXT/ZIP encryption.';
+    byId('manifestFileLabel').textContent = entry ? `${entry.name} · Original import metadata selected` : 'Not needed for Editable guide TXT; old combined TXT can use a manual layout.json.';
     reset();
   });
   const persistId = () => {
@@ -87,8 +87,8 @@
   drop.addEventListener('drop', (event) => chooseFile(event.dataTransfer?.files?.[0]));
   byId('clearEncryptFile').addEventListener('click', () => {
     file = null; upload.value = ''; reset();
-    byId('encryptFileTitle').textContent = 'Drop plaintext or a metadata archive here';
-    byId('encryptFileDescription').textContent = 'or browse your files to upload combined TXT, split ZIP, or a metadata archive';
+    byId('encryptFileTitle').textContent = 'Drop editable_guides.txt here';
+    byId('encryptFileDescription').textContent = 'or browse to select editable TXT or legacy files';
     show('clearEncryptFile', false); clearError(error);
   });
 
@@ -103,9 +103,9 @@
   }
   const safeFile = (name) => name.replace(/[\\/]/g, '_').replace(/[\x00-\x1f\x7f]/g, '_').slice(0, 180) || 'package.bin';
 
-  async function requestPackage(endpoint, id, source, manifestFile = null) {
+  async function requestPackage(endpoint, id, source, manifestFile = null, rememberedLayout = null) {
     const encoded = bytesToBase64(new Uint8Array(await source.arrayBuffer()));
-    const manifestEncoded = manifestFile ? bytesToBase64(new Uint8Array(await manifestFile.arrayBuffer())) : null;
+    const manifestEncoded = manifestFile ? bytesToBase64(new Uint8Array(await manifestFile.arrayBuffer())) : rememberedLayout ? btoa(rememberedLayout) : null;
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -137,20 +137,23 @@
     if (!id) { displayError(error, 'Enter the ID to encrypt the guides with.'); input.focus(); return; }
     if (!file) { displayError(error, 'Choose a plaintext guide file first.'); return; }
     const mf = manifestUpload.files?.[0] || null;
-    if (mf && !file.name.toLowerCase().endsWith('.txt')) { displayError(error, 'With a manifest, upload a combined plaintext .txt (not a ZIP).'); return; }
-    if (mf && mf.size > 4 * 1024 * 1024) { displayError(error, 'Manifest must be 4 MiB or less.'); return; }
+    const editableDocument = file.name.toLowerCase().endsWith('.txt') &&
+      (/^#!RXPTOOL\/1\r?\n/).test((await file.slice(0, 32).text()).replace(/^\uFEFF/, ''));
+    const useLayout = !editableDocument && !!mf;
+    if (useLayout && !file.name.toLowerCase().endsWith('.txt')) { displayError(error, 'With a manifest, upload a combined plaintext .txt (not a ZIP).'); return; }
+    if (!editableDocument && mf && mf.size > 4 * 1024 * 1024) { displayError(error, 'Manifest must be 4 MiB or less.'); return; }
     persistId(); clearError(error); reset();
     show('encryptEmpty', false); show('encryptLoading', true);
     byId('encryptSubmit').disabled = true;
     byId('encryptSubmitLabel').textContent = 'Encrypting…';
     const epoch = operationId;
     try {
-      const result = await requestPackage(mf ? '/api/rebuild' : '/api/encrypt', id, file, mf);
+      const result = await requestPackage(useLayout ? '/api/rebuild' : '/api/encrypt', id, file, editableDocument ? null : mf);
       if (epoch !== operationId) return;
       download = result;
       byId('encryptSuccessTitle').textContent = result.rebuilt ? 'Full import rebuilt' : (result.exactRestore ? 'Original import restored' : 'Round-trip verified');
       byId('encryptSuccessSubtitle').textContent = result.rebuilt ? 'Fresh encryption · Full import framing' : (result.exactRestore ? 'Byte-for-byte original payload' : 'Compatible with the Decrypt page');
-      byId('encryptResultHint').textContent = result.rebuilt ? 'Newly encrypted chunks preserve the header/footer, guide count and NUL slot layout. Checksums are recalculated. Verified against RXPTool Decrypt; in-game addon acceptance remains untested.' : (result.exactRestore ? 'This is the original, unmodified encrypted import preserved in your metadata archive. No re-encryption or account-ID changes were performed.' : 'On the Decrypt page, upload this .txt payload and enter the same ID. Individual guides and their contents will be recovered; combined separators are canonicalised.');
+      byId('encryptResultHint').textContent = result.rebuilt ? 'New encryption uses live guide markers rather than fixed NUL offsets. Header, footer and all empty slots are preserved; guide count and checksums are rebuilt. Verified against RXPTool Decrypt; WoW acceptance remains unverified.' : (result.exactRestore ? 'This is the original, unmodified encrypted import preserved in your metadata archive. No re-encryption or account-ID changes were performed.' : 'On the Decrypt page, upload this .txt payload and enter the same ID. Individual guides and their contents will be recovered; combined separators are canonicalised.');
       byId('encryptInputSize').textContent = sizeLabel(file.size);
       byId('encryptOutputSize').textContent = sizeLabel(result.blob.size);
       byId('encryptGuideCount').textContent = result.guideCount || '—';

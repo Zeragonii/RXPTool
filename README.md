@@ -1,6 +1,6 @@
 # RXPTool — Self-hosted Guide Encrypt / Decrypt
 
-A small, stateless, self-hosted browser UI for the included account-keyed guide payload decoder. Upload or paste an encrypted guide string, supply its matching identifier, and download decrypted plaintext. After decryption, choose a combined plaintext file, separate guide files, or a lossless import-and-metadata archive for exact restoration. Both export formats are available without uploading the payload again. Optionally remember the identifier in your browser's `localStorage` (not on the server).
+A small, stateless, self-hosted browser UI for the included account-keyed guide payload decoder. Upload or paste an encrypted guide string, supply its matching identifier, and download decrypted plaintext. After decryption, choose a self-contained editable TXT (recommended), legacy combined plaintext, separate guide files, or a lossless import-and-metadata archive for exact restoration. Both export formats are available without uploading the payload again. Optionally remember the identifier in your browser's `localStorage` (not on the server).
 
 > **Use only with data you have the right to access.** The software requires the matching account ID and does not attempt to recover unknown keys or bypass account-mismatch checks. The precise ID expected by the addon depends on its build; a displayed BattleTag may not always be that ID. This project is not affiliated with RestedXP.
 
@@ -12,13 +12,88 @@ A small, stateless, self-hosted browser UI for the included account-keyed guide 
 - Optional browser-only ID remembrance; no accounts database or persistent payload storage.
 - Existing Python decoder (`rxp_decrypt.py`) used directly by the FastAPI backend.
 - Matching **Encrypt** workspace: convert combined plaintext TXT or split ZIP guides into Base64-encoded payload text that the main **Decrypt** page accepts with the same ID. Legacy AES `.rxptool` recovery is retained for v1.1.0 files.
+- **v1.1.6: Edit without manifests:** the new editable TXT embeds guide boundaries and framing; no fixed NUL offsets or automatic layout storage.
 - **v1.1.3: Inspect original byte offsets:** a standalone `manifest.json` download records exact NUL separator offsets in each original chunk, plus literal outer header and footer text and the count/version fields when present. The lossless archive includes the same expanded manifest.
 - **v1.1.2: Preserve import metadata:** download a lossless archive, then restore the original encrypted payload with its original matching ID.
 - **v1.0.1: Choose your export:** download a combined NUL-delimited `decrypted_guides.txt` or a ZIP of individually named `.txt` guide files. Download any or all formats; alternatives are generated on demand without re-uploading.
-- The API accepts an optional `format` parameter: `combined`, `split`, `manifest`, `bundle`, or `auto` (the backward-compatible default). `auto` keeps the v1.0.0 behaviour: single guide → `.txt`, multiple guides → ZIP.
+- The API accepts an optional `format` parameter: `editable`, `combined`, `split`, `manifest`, `bundle`, or `auto` (the backward-compatible default). `auto` keeps the v1.0.0 behaviour: single guide → `.txt`, multiple guides → ZIP.
 - Input validation, integrity checks, request caps, concurrent-operation limit, and error feedback.
 - Optional HTTP Basic authentication (`RXP_USERNAME` and `RXP_PASSWORD` must be supplied together).
 - Health endpoint `/health`, nonroot Docker user, read-only filesystem and minimal container privileges.
+
+## v1.1.6 — Self-contained editable guide documents (recommended)
+
+**No manifest and no byte offsets for the recommended workflow.** The single exported
+`editable_guides.txt` carries all information required to rebuild a framed import:
+
+1. On **Decrypt**, provide a complete original encrypted import and its **matching original** account ID.
+2. Download **Editable guide TXT** (recommended). Don't choose legacy Combined plaintext.
+3. Edit or extend guide **content between `#!guide ...` and `#!endguide`**. You can add/remove whole
+   `#!guide` blocks; the header's guide count is recalculated. Leave the `#!` control lines
+   intact except when deliberately moving, adding, or deleting complete guide blocks.
+4. Open **Encrypt**, provide the edited `.txt` and the **same original account ID**. No JSON,
+   session storage or original encrypted text required.
+5. Download `rebuilt_import.txt`. Encryption, compression and Adler-32 checksums are generated
+   fresh; the decoded guide bytes are independently verified before download.
+
+A shortened example of the exported TXT (the fingerprint value is illustrative):
+
+```text
+#!RXPTOOL/1
+#!header="2|"
+#!footer="|40000"
+#!account_key_fingerprint="<SHA256 of derived original account key>"
+#!chunk
+#!empty
+#!guide trailing_lf=1
+#forever
+#group Custom
+#name First Guide
+step
+    +Start the journey
+#!endguide
+#!guide trailing_lf=1
+#forever
+#group Custom
+#name Second Guide
+step
+    +Continue the journey
+#!endguide
+#!endchunk
+#!end
+```
+
+`#!empty` represents an empty slot when the plaintext is NUL-split. **NUL positions are never stored.**
+Each `#!guide` is a nonempty slot; the parser inserts NUL bytes only *after* it reads the edited
+text. Multiple encrypted chunks are represented with `#!chunk` sections, separated by
+`#!between="..."` fields. Literal header/footer strings are JSON-escaped so newlines and
+whitespace are preserved. `trailing_lf=1` preserves a guide's terminal newline; `0` indicates
+that the original guide did not end with one. The line `#!endguide` is reserved and must not
+appear verbatim as a content line.
+
+**Matching-account only:** the sole fingerprint is of the original derived key, to ensure the
+same account ID is used for re-encryption. It is **not** a source-file hash and the editable
+document contains no archived encrypted bytes. The old `layout.json` and manifest paths remain
+available explicitly for legacy combined TXT; v1.1.6 does not generate or store a manifest
+automatically.
+
+**Validation boundary:** automated tests recover the original byte-exact raw chunks on an
+unedited document, and recover changed plaintext after guide-length edits. This does **not**
+prove native WoW addon acceptance. An existing "Error parsing guide" remains to be diagnosed.
+
+## v1.1.5 — Edit plaintext without handling source hashes or manually uploading a manifest
+
+**Normal same-tab workflow:**
+
+1. Open **Decrypt**, enter the original account ID, and upload the framed import.
+2. Download **Combined plaintext**. RXPTool automatically remembers a *small edit layout* in that browser tab. It contains the outer framing, guide count, per-chunk NUL positions, and one original-account key fingerprint. It contains **no original encrypted data or source-content SHA hashes**.
+3. Edit the combined TXT (keep the number and ordering of guides).
+4. Follow **Encrypt** in the **same browser tab**, select that TXT, and enter the same original account ID. The remembered layout is used automatically; no separate JSON upload is required.
+5. Download `rebuilt_import.txt`. Its encrypted contents are newly generated, not restored from original ciphertext.
+
+If the browser tab/session has closed, download `layout.json` separately during decryption and use the optional layout picker on Encrypt. Older full `manifest.json` files from v1.1.3/v1.1.4 still work. Separate lossless archive ZIP restoration continues unchanged.
+
+**Important:** The original account-key fingerprint remains as a same-account safeguard. It is not a content-integrity hash. No source-file SHA hash participates in the normal rebuild. Successful decoder round-trip **does not prove native addon parsing**; a previous WoW "Error parsing guide" remains under investigation. This release simplifies the workflow; it does not claim to fix that error.
 
 ## v1.1.4 — Edit plaintext, rebuild full framed import (original account only)
 
@@ -107,7 +182,7 @@ The GHCR image is **based on the repository's actual `owner/repo`**, converted t
 ```text
 ghcr.io/zeragonii/rxptool:latest
 ghcr.io/zeragonii/rxptool:edge
-ghcr.io/zeragonii/rxptool:1.1.4
+ghcr.io/zeragonii/rxptool:1.1.5
 ```
 
 The GitHub Actions workflow uses the repository's built-in `GITHUB_TOKEN` with `packages: write` for GHCR and `contents: write` for GitHub Releases. **No PAT or container registry password is needed in repository secrets.** GitHub packages can initially be **private**; after the first successful publish, go to your package's **Package settings → Change visibility → Public** if you want Portainer to pull without a registry login. Alternatively, keep the image private and configure GHCR registry credentials in Portainer. Ensure the GHCR package grants this repository permission to publish if a package with the same name already exists. See [GitHub's GHCR guide](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
@@ -116,7 +191,7 @@ The GitHub Actions workflow uses the repository's built-in `GITHUB_TOKEN` with `
 
 Your existing repository is [`Zeragonii/RXPTool`](https://github.com/Zeragonii/RXPTool). Copy the updated files from this archive over your checked-out copy, preserving its `.git/` folder. Do **not** run `git init` or add a new remote.
 
-This release changes `VERSION` to `1.1.4`. From the repository root:
+This release changes `VERSION` to `1.1.5`. From the repository root:
 
 ```powershell
 git add .
@@ -126,7 +201,7 @@ git tag v1.1.2
 git push origin v1.1.2
 ```
 
-Pushing `main` builds `:edge`. The new tag builds `:1.1.4` and `:latest` and creates the release. Don't reuse an existing tag.
+Pushing `main` builds `:edge`. The new tag builds `:1.1.5` and `:latest` and creates the release. Don't reuse an existing tag.
 
 ### B. Future releases (full copy/paste commands)
 

@@ -166,11 +166,34 @@ def manifest_json(manifest: dict) -> bytes:
 
 def build_import_manifest(payload: str, account_id: str, guides: list[bytes],
                           *, max_output_bytes: int, max_chunks: int) -> bytes:
-    """Return a standalone inspectable manifest.json (no original guide bytes)."""
-    manifest, _raw_chunks, _combined = make_import_manifest(
+    """Return a small, editable-layout JSON without archival file hashes.
+
+    v1.1.5 uses only metadata necessary to retain framing, empty guide slots,
+    and original account context. The full archival ZIP keeps its original
+    detailed manifest, so old archives and archive recovery remain compatible.
+    """
+    archived, _raw_chunks, _combined = make_import_manifest(
         payload, account_id, guides, max_output_bytes=max_output_bytes, max_chunks=max_chunks
     )
-    return manifest_json(manifest)
+    framing = archived['source']['framing']
+    layout = {
+        'schema': 'rxptool-edit-layout',
+        'schema_version': 1,
+        'description': 'Editable guide layout; no original encrypted bytes or source-file hashes',
+        'account_key_fingerprint': archived['source']['account_key_fingerprint'],
+        'header': framing['header']['raw'],
+        'footer': framing['footer']['raw'],
+        'inter_chunk_text': framing['inter_chunk_text'],
+        'guide_count': len(guides),
+        'chunks': [{
+            'index': c['index'],
+            'mode': c['mode'],
+            'plaintext_bytes': c['plaintext_bytes'],
+            'guides': c['guides'],
+            'nul_byte_offsets_0_based': c['nul_byte_offsets_0_based'],
+        } for c in archived['chunks']],
+    }
+    return manifest_json(layout)
 
 
 def build_import_bundle(payload: str, account_id: str, guides: list[bytes],

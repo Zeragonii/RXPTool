@@ -1,5 +1,33 @@
 # Changelog
 
+## v1.1.6 — 2026-11-02
+
+- Add **Editable guide TXT** as the recommended Decrypt export, a self-contained human-readable
+  document with literal header/footer, account-key fingerprint, `#!chunk`, `#!guide`,
+  `#!empty`, `#!between` and `#!endguide` markers.
+- Reconstruct NUL separators from **guide slots**, not stored byte positions. Editing steps
+  shifts guide boundaries automatically. Add/remove guide blocks and update guide count from
+  the actual content.
+- Encrypt the edited TXT directly via the existing Encrypt page: no separate manifest, no
+  browser session metadata, and no reuse of archived ciphertext. Checksum and encrypted bytes
+  are calculated from the freshly reconstructed guide chunks.
+- Strictly validate control lines, bound file sizes and counts, require the original account
+  key fingerprint, and independently verify every rebuilt raw chunk via the original decoder.
+- Retain legacy combined/split TXT, JSON layouts, archive restoration and package recovery.
+- Add automated tests for exact raw-byte round trips, multiple chunks, leading/repeated/
+  trailing NULs, edited guide length, guide count changes, CRLF and malformed documents,
+  plus a real 191-guide import test when a local sample is available.
+- **Native WoW acceptance remains unverified**; this version isolates whether fixed NUL
+  offsets were responsible for the previous parser error.
+
+## v1.1.5 — Simple edit/rebuild workflow
+
+- Decrypt now creates a lean `layout.json` without encrypted payload bytes, source SHA hashes, guide-content SHA hashes, or per-chunk content SHA hashes.
+- The browser tab remembers the lightweight layout following a successful Decrypt operation. Encrypt uses it automatically with a combined `.txt`, so no manual layout upload is needed in the normal same-tab workflow.
+- An explicit layout upload is retained as a fallback for later sessions, while legacy archival manifests and metadata ZIP restoration remain supported.
+- One original-account key fingerprint is retained to prevent re-binding third-party imports to another account.
+- No changes to the Lua parsing engine or the native cipher/checksum algorithm. Native WoW parsing failure is **not** claimed resolved.
+
 ## v1.1.4 — 2026-11-02
 
 - Add **Rebuild from manifest** to Encrypt: combined edited TXT + standalone v1.1.3 `manifest.json` + the original matching Battle.net ID.

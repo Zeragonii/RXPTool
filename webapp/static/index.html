@@ -10,8 +10,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/assets/app-v1.1.4.css" />
-  <script src="/assets/app-v1.1.4.js" defer></script>
+  <link rel="stylesheet" href="/assets/app-v1.1.6.css" />
+  <script src="/assets/app-v1.1.6.js" defer></script>
 </head>
 <body>
   <div class="ambient ambient-a" aria-hidden="true"></div>
@@ -84,25 +84,27 @@
               <ul id="filePreview" class="file-preview"></ul>
               <div class="export-label">CHOOSE YOUR DOWNLOAD</div>
               <div class="export-actions">
-                <button id="downloadCombined" class="download-btn" type="button" aria-describedby="combinedHint"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3h8l4 4v14H6V3Zm8 0v5h4M9 12h6M9 16h6" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>Combined plaintext <small>One .txt file</small></span></button>
+                <button id="downloadEditable" class="download-btn" type="button" aria-describedby="editableHint"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3h8l4 4v14H6V3Zm8 0v5h4M9 12h6M9 16h6" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>Editable guide TXT <small>Recommended · self-contained</small></span></button>
+                <button id="downloadCombined" class="download-btn download-btn-secondary" type="button" aria-describedby="combinedHint"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3h8l4 4v14H6V3Zm8 0v5h4M9 12h6M9 16h6" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>Combined plaintext <small>One .txt file</small></span></button>
                 <button id="downloadSplit" class="download-btn download-btn-secondary" type="button" aria-describedby="splitHint"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 8h16v12H4V8Zm4-4h8l2 4H6l2-4ZM8 12h8M8 16h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Separate guides <small>ZIP of .txt files</small></span></button>
 
-                <button id="downloadManifest" class="download-btn download-btn-secondary" type="button" aria-describedby="manifestHint"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.7"/></svg><span>Manifest JSON <small>Headers, footer &amp; NUL byte offsets</small></span></button>
+                <button id="downloadManifest" class="download-btn download-btn-secondary" type="button" aria-describedby="manifestHint"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.7"/></svg><span>Layout JSON <small>Headers, footer &amp; NUL byte offsets</small></span></button>
                 <button id="downloadBundle" class="download-btn download-btn-secondary" type="button" aria-describedby="bundleHint"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" stroke-width="1.7"/></svg><span>Download with metadata <small>Lossless import archive ZIP</small></span></button> 
               </div>
-              <p class="field-hint result-hint" id="combinedHint">Combined file uses NUL separators between guides.</p>
+              <p class="field-hint result-hint" id="editableHint">One editable file includes original header/footer and #!guide / #!empty markers. Edit steps freely, then upload this TXT on Encrypt. No manifest or fixed NUL offsets.</p>
+              <p class="field-hint result-hint" id="combinedHint">Legacy combined format: Combined file uses NUL separators between guides.</p>
               <p id="splitHint" class="sr-only">Each guide is a separate text file inside one ZIP archive.</p>
-              <p id="manifestHint" class="field-hint result-hint">Separate readable JSON file: preserves literal source header/footer text, per-chunk checksums and every NUL position (zero-based byte offsets).</p>
+              <p id="manifestHint" class="field-hint result-hint">Separate readable JSON file: preserves original header/footer text, guide count and NUL slot positions (zero-based byte offsets).</p>
               <p id="bundleHint" class="field-hint result-hint">Preserves the original import text, metadata, exact plaintext and chunk boundaries. Upload this ZIP to Encrypt with the original ID to restore the original import without changing any bytes.</p>
               <p class="export-status" id="downloadStatus" role="status" aria-live="polite">Choose any format. No need to upload again.</p>
             </div>
           </section>
-          <section class="info-panel"><div class="info-icon">i</div><div><h3>How it works</h3><p>Uses the same account-derived cipher and zlib integrity checks as the Lua importer. Choose combined plaintext, separate guides, a standalone JSON manifest, or a lossless archive.</p></div></section>
+          <section class="info-panel"><div class="info-icon">i</div><div><h3>How it works</h3><p>Uses the same account-derived cipher and zlib integrity checks as the Lua importer. Use Editable guide TXT for an all-in-one edit/re-encrypt workflow; legacy outputs remain available.</p></div></section>
           <section class="privacy-panel"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Private by design <small>No uploads saved or logged. Browser ID storage is opt-in.</small></span></section>
         </aside>
       </div>
     </main>
-    <footer><span>RXP Tool <span class="footer-sep">/</span> v1.1.4</span><span>Independent utility · Not affiliated with RestedXP</span></footer>
+    <footer><span>RXP Tool <span class="footer-sep">/</span> v1.1.6</span><span>Independent utility · Not affiliated with RestedXP</span></footer>
   </div>
 </body>
 </html>

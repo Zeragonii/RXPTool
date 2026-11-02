@@ -1,7 +1,7 @@
 """Rebuild an edited, *same-account* native-format guide import without stored ciphertext.
 
-The v1.1.3 standalone manifest records original framing, per-chunk NUL
-positions, and SHA-256 fingerprints of the source key. Reconstruct the
+The lean layout records original framing, per-chunk NUL positions and
+an original-account verification fingerprint. Reconstruct the
 original guide slots from that structure, substituting a new plaintext guide
 for each nonempty slot, then independently recompress/encrypt every chunk.
 
@@ -45,16 +45,40 @@ def rebuild_from_manifest(manifest_bytes: bytes, plaintext: bytes, account_id: s
         m = json.loads(manifest_bytes)
     except (UnicodeError, json.JSONDecodeError) as exc:
         raise RebuildError("Manifest is not valid JSON") from exc
-    if not isinstance(m, dict) or m.get("schema") != SCHEMA or m.get("schema_version") != 1:
-        raise RebuildError("Expected a v1.1.3 RXPTool import manifest")
-    source = m.get("source")
-    chunks = m.get("chunks")
-    guide_info = m.get("guides")
+    if not isinstance(m, dict) or m.get('schema_version') != 1:
+        raise RebuildError('Expected a RXPTool layout or legacy import manifest')
+    if m.get('schema') == 'rxptool-edit-layout':
+        # The lean layout is all we need for the edit/re-encrypt path; source
+        # SHA hashes, compressed lengths and archived ciphertext play no role.
+        head, foot = m.get('header'), m.get('footer')
+        framing = {
+            'input_kind': 'framed-import',
+            'header': {'raw': head, 'declared_guide_count': int(v.group(1)) if isinstance(head, str) and (v := re.search(r'(\d+)\|$', head)) else None},
+            'footer': {'raw': foot, 'addon_version': int(v.group(1)) if isinstance(foot, str) and (v := re.match(r'\|(\d+)', foot)) else None},
+            'inter_chunk_text': m.get('inter_chunk_text'),
+        }
+        source = {
+            'framing': framing,
+            'account_key_fingerprint': m.get('account_key_fingerprint'),
+            'declared_guide_count': framing['header']['declared_guide_count'],
+            'import_version': framing['footer']['addon_version'],
+        }
+        guide_info = {'count': m.get('guide_count')}
+        chunks = m.get('chunks')
+    elif m.get('schema') == SCHEMA:
+        source = m.get('source')
+        chunks = m.get('chunks')
+        guide_info = m.get('guides')
+    else:
+        raise RebuildError('Expected a RXPTool layout or legacy import manifest')
     if not isinstance(source, dict) or not isinstance(guide_info, dict) or not isinstance(chunks, list):
         raise RebuildError("Manifest is missing source, guides or chunks")
     if not 1 <= len(chunks) <= MAX_CHUNKS:
         raise RebuildError("Manifest has no chunks or too many chunks")
     fingerprint = hashlib.sha256(derive_base(account_id)).hexdigest()
+    if source.get("account_key_fingerprint") != fingerprint:
+        raise RebuildError("ID does not match the original import's key fingerprint; same-account rebuilding only")
+
     framing = source.get("framing")
     if not isinstance(framing, dict) or framing.get("input_kind") != "framed-import":
         raise RebuildError("A full import header and footer are required; standalone chunks cannot be rebuilt as a native import")
@@ -87,7 +111,7 @@ def rebuild_from_manifest(manifest_bytes: bytes, plaintext: bytes, account_id: s
     permutation = initial_permutation(derive_base(account_id))
     guide_idx = 0
     encoded = []
-    edited = (hashlib.sha256(plaintext).hexdigest() != guide_info.get("combined_sha256"))
+    edited = (hashlib.sha256(plaintext).hexdigest() != guide_info.get('combined_sha256')) if guide_info.get('combined_sha256') else None
     for i, chunk in enumerate(chunks, 1):
         if not isinstance(chunk, dict) or chunk.get("index") != i or chunk.get("mode") != ":":
             raise RebuildError(f"Invalid metadata for chunk {i}")

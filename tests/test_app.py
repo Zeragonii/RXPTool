@@ -190,20 +190,20 @@ def test_versioned_asset_urls_and_strict_csp():
 
     page = client.get('/')
     assert page.status_code == 200
-    assert 'src="/assets/app-v1.1.4.js"' in page.text
-    assert 'href="/assets/app-v1.1.4.css"' in page.text
-    assert 'v1.1.4' in page.text
+    assert 'src="/assets/app-v1.1.6.js"' in page.text
+    assert 'href="/assets/app-v1.1.6.css"' in page.text
+    assert 'v1.1.6' in page.text
     assert not re.search(r'<script(?![^>]*\bsrc=)', page.text, flags=re.I)
     assert "script-src 'self'" in page.headers['content-security-policy']
     assert "'unsafe-inline'" not in page.headers['content-security-policy']
-    for asset, media in [('app-v1.1.4.js', 'application/javascript'), ('app-v1.1.4.css', 'text/css')]:
+    for asset, media in [('app-v1.1.6.js', 'application/javascript'), ('app-v1.1.6.css', 'text/css')]:
         response = client.get('/assets/' + asset)
         assert response.status_code == 200
         assert response.headers['content-type'].startswith(media)
         assert response.headers['cache-control'] == 'no-store'
         assert response.content == client.get('/assets/' + asset.replace('-v1.1.4', '')).content
-    assert 'downloadCombined' in client.get('/assets/app-v1.1.4.js').text
-    assert "missingIds" in client.get('/assets/app-v1.1.4.js').text
+    assert 'downloadCombined' in client.get('/assets/app-v1.1.6.js').text
+    assert "missingIds" in client.get('/assets/app-v1.1.6.js').text
     assert client.get('/assets/app-v1.0.3.js').status_code == 404
 
 
@@ -215,10 +215,10 @@ def test_encrypt_page_has_separate_route_and_navigation():
     assert 'id="encryptForm"' in page.text
     assert 'id="recoveryForm"' in page.text  # old .rxptool recovery is retained
     assert 'Compatible with the Decrypt page' in page.text
-    assert 'src="/assets/encrypt-v1.1.4.js"' in page.text
+    assert 'src="/assets/encrypt-v1.1.6.js"' in page.text
     assert '<script>' not in page.text
-    assert client.get('/assets/encrypt-v1.1.4.js').status_code == 200
-    assert 'encryptGuideCount' in client.get('/assets/encrypt-v1.1.4.js').text
+    assert client.get('/assets/encrypt-v1.1.6.js').status_code == 200
+    assert 'encryptGuideCount' in client.get('/assets/encrypt-v1.1.6.js').text
 
 
 def _encrypt_via_api(data: bytes, filename: str = 'guides.txt', account_id: str = 'Example#1234'):
@@ -434,7 +434,7 @@ def test_lossless_bundle_does_not_change_existing_download_modes():
     })
     assert separate.status_code == 200
     assert separate.headers['x-output-format'] == 'split'
-    assert b'downloadBundle' in client.get('/assets/app-v1.1.4.js').content
+    assert b'downloadBundle' in client.get('/assets/app-v1.1.6.js').content
     assert 'id="downloadBundle"' in client.get('/').text
     assert 'metadata archive' in client.get('/encrypt').text
 
@@ -447,30 +447,25 @@ def test_standalone_manifest_preserves_header_footer_and_all_nuls():
         'battle_id': 'Tester#12345', 'payload': payload, 'format': 'manifest'
     })
     assert result.status_code == 200, result.text
-    assert result.headers['x-output-format'] == 'manifest'
-    assert 'manifest.json' in result.headers['content-disposition']
+    assert 'layout.json' in result.headers['content-disposition']
     metadata = result.json()
-    assert metadata['source']['framing']['input_kind'] == 'framed-import'
-    assert metadata['source']['framing']['header'] == {'raw': '\n3|', 'declared_guide_count': 3}
-    assert metadata['source']['framing']['footer'] == {'raw': '|40000\n', 'addon_version': 40000}
-    assert metadata['source']['framing']['inter_chunk_text'] == [' \n']
+    assert metadata['schema'] == 'rxptool-edit-layout'
+    assert metadata['header'] == '\n3|'
+    assert metadata['footer'] == '|40000\n'
+    assert metadata['inter_chunk_text'] == [' \n']
+    assert metadata['guide_count'] == 3
     assert metadata['chunks'][0]['nul_byte_offsets_0_based'] == [i for i, b in enumerate(raw_one) if b == 0]
     assert metadata['chunks'][1]['nul_byte_offsets_0_based'] == [i for i, b in enumerate(raw_two) if b == 0]
-    assert metadata['chunks'][0]['raw_stream_start_byte_0_based'] == 0
-    assert metadata['chunks'][1]['raw_stream_start_byte_0_based'] == len(raw_one)
-    assert metadata['offsets']['raw_chunks_concatenated_nul_byte_offsets_0_based'] == [
-        i for i, b in enumerate(raw_one + raw_two) if b == 0
-    ]
-    combined = b'\0'.join(g for raw in [raw_one, raw_two] for g in raw.split(b'\0') if g)
-    assert metadata['offsets']['normalized_combined_nul_byte_offsets_0_based'] == [
-        i for i, b in enumerate(combined) if b == 0
-    ]
-    assert len(metadata['offsets']['raw_chunks_concatenated_nul_byte_offsets_0_based']) > len(metadata['offsets']['normalized_combined_nul_byte_offsets_0_based'])
+    assert 'payload_sha256' not in metadata
+    assert 'combined_sha256' not in metadata
+    assert 'plaintext_sha256' not in str(metadata)
     assert b'Tester#12345' not in result.content
     archive = _bundle_for(payload)
     assert archive.status_code == 200, archive.text
     with zipfile.ZipFile(io.BytesIO(archive.content)) as zf:
-        assert zf.read('manifest.json') == result.content
+        # Legacy archival manifest deliberately retains its original structure.
+        archive_manifest = json.loads(zf.read('manifest.json'))
+        assert archive_manifest['schema'] == 'rxptool-import-archive'
     restored = _restore_bundle(archive.content)
     assert restored.status_code == 200, restored.text
     assert restored.content.decode() == payload
@@ -483,19 +478,17 @@ def test_raw_chunk_manifest_does_not_invent_header_footer():
     })
     assert result.status_code == 200
     meta = result.json()
-    assert meta['source']['framing']['input_kind'] == 'chunk-data'
-    assert meta['source']['framing']['header']['raw'] is None
-    assert meta['source']['framing']['footer']['raw'] is None
-    assert meta['source']['framing']['header']['declared_guide_count'] is None
-    assert meta['source']['framing']['footer']['addon_version'] is None
-    assert meta['offsets']['raw_chunks_concatenated_nul_byte_offsets_0_based'] == []
+    assert meta['header'] is None
+    assert meta['footer'] is None
+    assert meta['guide_count'] == 1
+    assert meta['chunks'][0]['nul_byte_offsets_0_based'] == []
 
 
 def test_manifest_ui_and_asset_route():
     home = client.get('/').text
     assert 'id="downloadManifest"' in home
     assert 'Headers, footer' in home
-    app_js = client.get('/assets/app-v1.1.4.js')
+    app_js = client.get('/assets/app-v1.1.6.js')
     assert app_js.status_code == 200
     assert 'downloadFormat(\'manifest\')' in app_js.text
 
