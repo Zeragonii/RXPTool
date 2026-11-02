@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Local runtime and secret configuration
+.env
+.env.*
+!.env.example
+
+# Local guide/payload data — never commit account-linked exports
+payload*.txt
+decrypted*.txt
+*.rxp
+*.rxp.txt
+*.log
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local build archives
+*.zip
+*.tar

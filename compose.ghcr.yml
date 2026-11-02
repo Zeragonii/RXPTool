@@ -1,0 +1,22 @@
+# Run the image published by GitHub Actions; no local build is needed.
+# Default: stable release. Set RXP_IMAGE to :edge to use main builds.
+services:
+  rxp-decrypt:
+    image: ${RXP_IMAGE:-ghcr.io/zeragonii/rxp-decrypt-web:latest}
+    pull_policy: always
+    container_name: rxp-decrypt
+    restart: unless-stopped
+    ports:
+      - "${RXP_BIND_IP:-0.0.0.0}:8787:8787"
+    environment:
+      RXP_USERNAME: ${RXP_USERNAME:-}
+      RXP_PASSWORD: ${RXP_PASSWORD:-}
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 100
+    mem_limit: 512m

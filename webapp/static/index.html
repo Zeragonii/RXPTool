@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="referrer" content="no-referrer" />
+  <meta name="theme-color" content="#0a1020" />
+  <title>RXP Decoder · Self-hosted guide utility</title>
+  <link rel="stylesheet" href="/assets/app.css" />
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <div class="ambient ambient-a" aria-hidden="true"></div>
+  <div class="ambient ambient-b" aria-hidden="true"></div>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 40 40" width="30" height="30" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 3L35.5 11.5V28.5L20 37L4.5 28.5V11.5L20 3Z" stroke="currentColor" stroke-width="2.5"/><path d="M13 14H26L18 22H27" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 27H24" stroke="#5EEAD4" stroke-width="3" stroke-linecap="round"/></svg>
+        </span>
+        <span class="brand-label">RXP <strong>Decoder</strong><small>SELF-HOSTED UTILITY</small></span>
+      </div>
+      <span class="status"><span class="status-dot"></span> Local processing</span>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="title">
+        <div class="eyebrow"><span class="eyebrow-line"></span> YOUR PAYLOADS. YOUR SERVER.</div>
+        <h1 id="title">Guides, <span>unlocked<br class="hero-break" /> into plaintext.</span></h1>
+        <p>Upload an encrypted guide export, provide the account ID used to encrypt it, and recover clean guide files in one click.</p>
+        <div class="hero-points"><span><i aria-hidden="true">✓</i> Automatic guide splitting</span><span><i aria-hidden="true">✓</i> One-click ZIP export</span><span><i aria-hidden="true">✓</i> No server-side history</span></div>
+      </section>
+
+      <div class="main-grid">
+        <section class="panel form-panel" aria-labelledby="form-title">
+          <div class="panel-top"><div><span class="overline">DECRYPT WORKSPACE</span><h2 id="form-title">New decryption</h2></div><span class="step-counter">01 / 02</span></div>
+          <form id="decryptForm" novalidate>
+            <div class="field-label"><span class="field-number">01</span><label for="battleId">Battle.net ID</label><span class="required">REQUIRED</span></div>
+            <div class="id-field">
+              <svg class="input-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4.5 20a7.5 7.5 0 0 1 15 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              <input id="battleId" name="battleId" type="text" placeholder="YourName#1234" maxlength="256" autocomplete="off" spellcheck="false" aria-describedby="idHint" />
+              <button id="showId" class="icon-button" type="button" title="Hide or show account ID" aria-label="Hide account ID"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2.5 12S6 6.5 12 6.5s9.5 5.5 9.5 5.5-3.5 5.5-9.5 5.5S2.5 12 2.5 12Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg></button>
+            </div>
+            <p class="field-hint" id="idHint">Use the exact account identifier expected by the addon.</p>
+            <label class="remember"><input id="rememberId" type="checkbox" /><span class="checkmark" aria-hidden="true"></span><span>Remember this ID on this device <small>Saved only in this browser's local storage</small></span></label>
+
+            <div class="soft-rule"></div>
+            <div class="field-label"><span class="field-number">02</span><span>Encrypted payload</span><span class="required">REQUIRED</span></div>
+            <div class="tabs" role="tablist" aria-label="Payload input method">
+              <button id="tabUpload" type="button" role="tab" aria-selected="true" aria-controls="uploadPanel" class="tab active"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V3m0 0L7.5 7.5M12 3l4.5 4.5M5 15v3.5A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Upload file</button>
+              <button id="tabPaste" type="button" role="tab" aria-selected="false" aria-controls="pastePanel" class="tab"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 4h10a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2ZM4 16H3V3a1 1 0 0 1 1-1h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg> Paste text</button>
+            </div>
+            <div id="uploadPanel" role="tabpanel" aria-labelledby="tabUpload">
+              <input id="payloadFile" type="file" accept=".txt,.rxp,.json,.dat,text/plain" hidden />
+              <div id="dropZone" class="dropzone" role="button" tabindex="0" aria-label="Upload encrypted payload file">
+                <div class="drop-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 16V3m0 0L7.5 7.5M12 3l4.5 4.5M4.5 16v3A2.5 2.5 0 0 0 7 21.5h10a2.5 2.5 0 0 0 2.5-2.5v-3" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                <strong id="fileTitle">Drop an encrypted payload here</strong>
+                <p id="fileDescription">or <span class="browse-link">browse your files</span> to select a text export</p>
+                <small>TXT, RXP or text-based export · Up to 16 MiB</small>
+              </div>
+              <button type="button" id="clearFile" class="clear-file" hidden>Remove selected file</button>
+            </div>
+            <div id="pastePanel" role="tabpanel" aria-labelledby="tabPaste" hidden>
+              <textarea id="payloadText" placeholder="Paste the complete encrypted RXP import string here…" spellcheck="false" rows="7" aria-label="Encrypted payload"></textarea>
+              <p class="field-hint">Supports full import strings, individual chunks, or raw Base64.</p>
+            </div>
+            <div id="error" class="error-box" role="alert" hidden></div>
+            <button id="submitBtn" type="submit" class="primary-btn"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m13 3-8 10h7l-1 8 8-11h-7l1-7Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span id="submitLabel">Decrypt payload</span><svg class="button-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12 14 0m0 0-6-6m6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <p class="submit-note">Files are processed in memory. No plaintext or ID is stored on the server.</p>
+          </form>
+        </section>
+
+        <aside class="sidebar" aria-label="Output and information">
+          <section class="panel output-panel" aria-labelledby="outputTitle">
+            <div class="panel-top"><div><span class="overline">OUTPUT</span><h2 id="outputTitle">Decryption result</h2></div><span class="step-counter">02 / 02</span></div>
+            <div id="emptyState" class="empty-state"><div class="empty-illustration" aria-hidden="true"><svg viewBox="0 0 92 92" fill="none"><rect x="17" y="11" width="58" height="70" rx="11" stroke="currentColor" stroke-width="2"/><path d="M30 32h32M30 43h23M30 54h29" stroke="currentColor" stroke-opacity=".65" stroke-width="3" stroke-linecap="round"/><circle cx="70" cy="70" r="17" fill="#101d30" stroke="#5EEAD4" stroke-width="2.5"/><path d="m63 70 5 5 10-11" stroke="#5EEAD4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div><strong>Ready when you are</strong><p>Your decrypted guides will appear here once processing completes.</p></div>
+            <div id="loadingState" class="loading-state" hidden><div class="spinner"></div><strong>Decrypting payload…</strong><p>Decoding, checking integrity and splitting guides.</p></div>
+            <div id="resultState" hidden>
+              <div class="success-heading"><div class="success-icon">✓</div><div><strong>Decryption successful</strong><span>Guides are ready to download</span></div></div>
+              <div class="stats"><div><span>GUIDES</span><strong id="guideCount">—</strong></div><div><span>CHUNKS</span><strong id="chunkCount">—</strong></div><div><span>OUTPUT</span><strong id="outputSize">—</strong></div></div>
+              <div class="result-label">RECOVERED FILES <span id="previewSuffix"></span></div>
+              <ul id="filePreview" class="file-preview"></ul>
+              <button id="downloadBtn" class="download-btn" type="button"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v13m0 0 5-5m-5 5-5-5M4.5 17.5V19A2.5 2.5 0 0 0 7 21.5h10a2.5 2.5 0 0 0 2.5-2.5v-1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="downloadText">Download guides</span></button>
+              <p class="field-hint result-hint" id="downloadHint"></p>
+            </div>
+          </section>
+          <section class="info-panel"><div class="info-icon">i</div><div><h3>How it works</h3><p>Uses the same account-derived cipher and zlib integrity checks as the Lua importer. If multiple guides are found, each one is exported as a separate file in a ZIP.</p></div></section>
+          <section class="privacy-panel"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Private by design <small>No uploads saved or logged. Browser ID storage is opt-in.</small></span></section>
+        </aside>
+      </div>
+    </main>
+    <footer><span>RXP Decoder <span class="footer-sep">/</span> v1.0</span><span>Independent utility · Not affiliated with RestedXP</span></footer>
+  </div>
+</body>
+</html>
