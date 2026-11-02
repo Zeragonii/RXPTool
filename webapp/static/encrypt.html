@@ -10,8 +10,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/assets/app-v1.1.3.css" />
-  <script src="/assets/encrypt-v1.1.3.js" defer></script>
+  <link rel="stylesheet" href="/assets/app-v1.1.4.css" />
+  <script src="/assets/encrypt-v1.1.4.js" defer></script>
 </head>
 <body>
   <div class="ambient ambient-a" aria-hidden="true"></div>
@@ -31,10 +31,10 @@
       <section class="hero" aria-labelledby="title">
         <div class="eyebrow"><span class="eyebrow-line"></span> REVERSE THE DECRYPTION PIPELINE.</div>
         <h1 id="title">Guides, <span>encrypted<br class="hero-break" /> and reversible.</span></h1>
-        <p>Upload plaintext guides to encrypt, or upload a metadata archive from Decrypt to restore its original import exactly using the original ID.</p>
+        <p>Upload plaintext guides to encrypt, or rebuild an edited full import using your Decrypt manifest and the original ID.</p>
         <div class="hero-points"><span><i aria-hidden="true">✓</i> Matching account-derived cipher</span><span><i aria-hidden="true">✓</i> Direct Decrypt compatibility</span><span><i aria-hidden="true">✓</i> No server-side history</span></div>
       </section>
-      <div class="notice-bar" role="note"><strong>Choose how to process</strong><span>Upload a regular TXT/ZIP to create a new RXPTool-compatible payload, or upload the <code>rxptool_import_bundle.zip</code> downloaded from Decrypt to restore its exact original import using the original ID. This archive cannot be rebound to a different ID.</span></div>
+      <div class="notice-bar" role="note"><strong>Choose how to process</strong><span>For an editable full import: upload combined plaintext TXT and the standalone manifest JSON from Decrypt, then enter the original account ID. The rebuilt payload is created from fresh ciphertext; it does not reuse saved encrypted bytes. Regular TXT/ZIP imports and exact archive restoration remain available.</span></div>
       <div class="main-grid">
         <section class="panel form-panel" aria-labelledby="form-title">
           <div class="panel-top"><div><span class="overline">ENCRYPT WORKSPACE</span><h2 id="form-title">Create a package</h2></div><span class="step-counter">01 / 02</span></div>
@@ -57,15 +57,20 @@
               <small>TXT / ZIP / raw guide files · Maximum 16 MiB</small>
             </div>
             <button id="clearEncryptFile" class="clear-file" type="button" hidden>Remove selected file</button>
+            <div class="soft-rule"></div>
+            <div class="field-label"><span class="field-number">03</span><label for="encryptManifest">Original import manifest</label><span class="required">OPTIONAL</span></div>
+            <p class="field-hint">For editable, fully framed imports, upload the standalone <code>manifest.json</code> from Decrypt. Supply the matching original ID and a combined plaintext TXT with the same guide count and order. No archived ciphertext is used.</p>
+            <input id="encryptManifest" type="file" accept=".json,application/json" class="recovery-file-input" />
+            <p id="manifestFileLabel" class="field-hint">No manifest selected — regular TXT/ZIP encryption.</p>
             <div id="encryptError" class="error-box" role="alert" hidden></div>
             <button id="encryptSubmit" type="submit" class="primary-btn"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span id="encryptSubmitLabel">Encrypt guides</span><svg class="button-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12 14 0m0 0-6-6m6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-            <p class="submit-note">TXT and ordinary ZIP files are newly encoded and round-trip checked. Metadata archives are restored byte-for-byte, only if the original ID and archived data match.</p>
+            <p class="submit-note">Manifest + combined TXT: freshly rebuilds header, chunks, checksums and footer for the original ID. Without a manifest, regular TXT/ZIP round-trips as before. Legacy metadata archives are restored unchanged.</p>
           </form>
         </section>
         <aside class="sidebar" aria-label="Output and recovery">
           <section class="panel output-panel" aria-labelledby="outputTitle">
             <div class="panel-top"><div><span class="overline">OUTPUT</span><h2 id="outputTitle">Encoded guide payload</h2></div><span class="step-counter">02 / 02</span></div>
-            <div id="encryptEmpty" class="empty-state"><div class="empty-illustration" aria-hidden="true"><svg viewBox="0 0 92 92" fill="none"><rect x="18" y="15" width="56" height="65" rx="11" stroke="currentColor" stroke-width="2"/><path d="M32 38h28m-28 10h25" stroke="currentColor" stroke-width="2"/><rect x="54" y="54" width="28" height="25" rx="6" fill="#101d30" stroke="#5EEAD4" stroke-width="2.5"/><path d="M61 54v-7a7 7 0 0 1 14 0v7" stroke="#5EEAD4" stroke-width="2.5"/></svg></div><strong>Ready to process</strong><p>Your encoded import or restored original payload will appear here when processing finishes.</p></div>
+            <div id="encryptEmpty" class="empty-state"><div class="empty-illustration" aria-hidden="true"><svg viewBox="0 0 92 92" fill="none"><rect x="18" y="15" width="56" height="65" rx="11" stroke="currentColor" stroke-width="2"/><path d="M32 38h28m-28 10h25" stroke="currentColor" stroke-width="2"/><rect x="54" y="54" width="28" height="25" rx="6" fill="#101d30" stroke="#5EEAD4" stroke-width="2.5"/><path d="M61 54v-7a7 7 0 0 1 14 0v7" stroke="#5EEAD4" stroke-width="2.5"/></svg></div><strong>Ready to encrypt</strong><p>Your encoded import or restored original payload will appear here when processing finishes.</p></div>
             <div id="encryptLoading" class="loading-state" hidden><div class="spinner"></div><strong>Processing guides…</strong><p>Validating the archive or encrypting and verifying with the main decoder.</p></div>
             <div id="encryptResult" hidden><div class="success-heading"><div class="success-icon">✓</div><div><strong id="encryptSuccessTitle">Round-trip verified</strong><span id="encryptSuccessSubtitle">Compatible with the Decrypt page</span></div></div><div class="stats"><div><span>INPUT</span><strong id="encryptInputSize">—</strong></div><div><span>PAYLOAD</span><strong id="encryptOutputSize">—</strong></div><div><span>GUIDES</span><strong id="encryptGuideCount">—</strong></div></div><p class="field-hint" id="encryptResultHint">On the Decrypt page, upload this .txt payload and enter the same ID. Individual guides and their contents will be recovered; combined separators are canonicalised.</p><button id="downloadEncrypted" type="button" class="download-btn"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 17v3h16v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg> Download encrypted payload</button></div>
           </section>
@@ -84,7 +89,7 @@
         </aside>
       </div>
     </main>
-    <footer><span>RXP Tool <span class="footer-sep">/</span> v1.1.3</span><span>Independent utility · Not affiliated with RestedXP</span></footer>
+    <footer><span>RXP Tool <span class="footer-sep">/</span> v1.1.4</span><span>Independent utility · Not affiliated with RestedXP</span></footer>
   </div>
 </body>
 </html>

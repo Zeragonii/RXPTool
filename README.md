@@ -20,6 +20,22 @@ A small, stateless, self-hosted browser UI for the included account-keyed guide 
 - Optional HTTP Basic authentication (`RXP_USERNAME` and `RXP_PASSWORD` must be supplied together).
 - Health endpoint `/health`, nonroot Docker user, read-only filesystem and minimal container privileges.
 
+## v1.1.4 — Edit plaintext, rebuild full framed import (original account only)
+
+RXPTool now has a third Encrypt workflow that **creates fresh encrypted bytes**, rather than returning previously archived ciphertext. Use it to study/edit plaintext guides for the *same account key as the original import*:
+
+1. On **Decrypt**, upload a complete original import string and your original account ID. Download **Combined plaintext** and **Manifest JSON** separately. The standalone JSON includes a source-key fingerprint, not your ID.
+2. Edit the combined `decrypted_guides.txt`, preserving guide count and guide order. Do not insert or remove NUL separators. Individual guide byte lengths may change.
+3. On **Encrypt**, upload the edited combined plaintext TXT, supply `manifest.json` using the new optional file picker, and enter the **original matching** account ID.
+4. Download `rebuilt_import.txt`, a freshly generated full import string that preserves the original literal header, footer and between-chunk text. It preserves the original layout of empty NUL slots across chunks, while updating all content-dependent checksums after edits.
+5. The backend independently decrypts the generated import using the existing decoder and rejects mismatched output before returning a file.
+
+A bare `checksum:base64%` input is **not sufficient** for this mode; the original import needs full `guideCount|...|addonVersion` framing. This mode rejects a new/alternative Battle.net ID (account key fingerprint must match). It cannot add or remove guide entries; original guide ordering and per-chunk allocation are preserved. The separate *Download with metadata* archive remains available for byte-exact restoration of an **unmodified original**.
+
+Endpoint: `POST /api/rebuild` with JSON `{"battle_id":"original ID","content_base64":"base64 combined TXT","manifest_base64":"base64 manifest JSON"}`. Returns `rebuilt_import.txt`.
+
+**Verification boundary:** This generates an import with syntactically correct outer framing, checksum-prefixed chunks and a valid decode round-trip. **Native RestedXP addon acceptance is unverified**: UI parsing, game version, entitlement and other addon checks may also apply. Test with original/authorised guide content before relying on it.
+
 ## v1.1.3 — Inspectable header/footer and NUL separator manifest
 
 After a successful decryption, click **Manifest JSON** to download a *separate* `manifest.json`, without downloading the archive. The same expanded manifest is inside **Download with metadata**. It contains:
@@ -91,7 +107,7 @@ The GHCR image is **based on the repository's actual `owner/repo`**, converted t
 ```text
 ghcr.io/zeragonii/rxptool:latest
 ghcr.io/zeragonii/rxptool:edge
-ghcr.io/zeragonii/rxptool:1.1.3
+ghcr.io/zeragonii/rxptool:1.1.4
 ```
 
 The GitHub Actions workflow uses the repository's built-in `GITHUB_TOKEN` with `packages: write` for GHCR and `contents: write` for GitHub Releases. **No PAT or container registry password is needed in repository secrets.** GitHub packages can initially be **private**; after the first successful publish, go to your package's **Package settings → Change visibility → Public** if you want Portainer to pull without a registry login. Alternatively, keep the image private and configure GHCR registry credentials in Portainer. Ensure the GHCR package grants this repository permission to publish if a package with the same name already exists. See [GitHub's GHCR guide](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
@@ -100,7 +116,7 @@ The GitHub Actions workflow uses the repository's built-in `GITHUB_TOKEN` with `
 
 Your existing repository is [`Zeragonii/RXPTool`](https://github.com/Zeragonii/RXPTool). Copy the updated files from this archive over your checked-out copy, preserving its `.git/` folder. Do **not** run `git init` or add a new remote.
 
-This release changes `VERSION` to `1.1.2`. From the repository root:
+This release changes `VERSION` to `1.1.4`. From the repository root:
 
 ```powershell
 git add .
@@ -110,11 +126,11 @@ git tag v1.1.2
 git push origin v1.1.2
 ```
 
-Pushing `main` builds `:edge`. The new tag builds `:1.1.1` and `:latest` and creates the release. Don't reuse an existing tag.
+Pushing `main` builds `:edge`. The new tag builds `:1.1.4` and `:latest` and creates the release. Don't reuse an existing tag.
 
 ### B. Future releases (full copy/paste commands)
 
-For the next release, change `VERSION` to `1.1.2` and make your code updates. Then:
+For the next release, change `VERSION` to `1.1.5` and make your code updates. Then:
 
 ```bash
 git add .

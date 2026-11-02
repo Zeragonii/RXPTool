@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.1.4 — 2026-11-02
+
+- Add **Rebuild from manifest** to Encrypt: combined edited TXT + standalone v1.1.3 `manifest.json` + the original matching Battle.net ID.
+- Generate **new** encrypted chunks; never restore or reuse ciphertext from the source export. Preserve original header/footer, between-chunk text, guide order, chunk-level empty NUL slot patterns, and guide count.
+- Recompute zlib streams, Adler-32 checksums and Base64 after modifying plaintext; use the same key derivation/cipher as the existing decoder.
+- Match the import's recorded original key fingerprint; reject attempts to change the account identifier through this route.
+- Verify reconstruction with the unmodified RXPTool decoder before download. **Does not claim in-game addon acceptance**, which requires testing inside WoW.
+- Keep normal TXT/ZIP encrypt/decrypt, exact metadata-bundle restore and legacy `.rxptool` recovery unchanged.
+- Add API and unit coverage for changed guide text, multichunk source framing, repeated/leading/trailing NULs and mismatched identifiers.
+
+
 ## v1.1.3 — 2026-11-02
 
 - Add a separate **Manifest JSON** download button on the Decrypt page, alongside existing combined, split and bundle downloads.

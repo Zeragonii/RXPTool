@@ -190,20 +190,20 @@ def test_versioned_asset_urls_and_strict_csp():
 
     page = client.get('/')
     assert page.status_code == 200
-    assert 'src="/assets/app-v1.1.3.js"' in page.text
-    assert 'href="/assets/app-v1.1.3.css"' in page.text
-    assert 'v1.1.3' in page.text
+    assert 'src="/assets/app-v1.1.4.js"' in page.text
+    assert 'href="/assets/app-v1.1.4.css"' in page.text
+    assert 'v1.1.4' in page.text
     assert not re.search(r'<script(?![^>]*\bsrc=)', page.text, flags=re.I)
     assert "script-src 'self'" in page.headers['content-security-policy']
     assert "'unsafe-inline'" not in page.headers['content-security-policy']
-    for asset, media in [('app-v1.1.3.js', 'application/javascript'), ('app-v1.1.3.css', 'text/css')]:
+    for asset, media in [('app-v1.1.4.js', 'application/javascript'), ('app-v1.1.4.css', 'text/css')]:
         response = client.get('/assets/' + asset)
         assert response.status_code == 200
         assert response.headers['content-type'].startswith(media)
         assert response.headers['cache-control'] == 'no-store'
-        assert response.content == client.get('/assets/' + asset.replace('-v1.1.3', '')).content
-    assert 'downloadCombined' in client.get('/assets/app-v1.1.3.js').text
-    assert "missingIds" in client.get('/assets/app-v1.1.3.js').text
+        assert response.content == client.get('/assets/' + asset.replace('-v1.1.4', '')).content
+    assert 'downloadCombined' in client.get('/assets/app-v1.1.4.js').text
+    assert "missingIds" in client.get('/assets/app-v1.1.4.js').text
     assert client.get('/assets/app-v1.0.3.js').status_code == 404
 
 
@@ -215,10 +215,10 @@ def test_encrypt_page_has_separate_route_and_navigation():
     assert 'id="encryptForm"' in page.text
     assert 'id="recoveryForm"' in page.text  # old .rxptool recovery is retained
     assert 'Compatible with the Decrypt page' in page.text
-    assert 'src="/assets/encrypt-v1.1.3.js"' in page.text
+    assert 'src="/assets/encrypt-v1.1.4.js"' in page.text
     assert '<script>' not in page.text
-    assert client.get('/assets/encrypt-v1.1.3.js').status_code == 200
-    assert 'encryptGuideCount' in client.get('/assets/encrypt-v1.1.3.js').text
+    assert client.get('/assets/encrypt-v1.1.4.js').status_code == 200
+    assert 'encryptGuideCount' in client.get('/assets/encrypt-v1.1.4.js').text
 
 
 def _encrypt_via_api(data: bytes, filename: str = 'guides.txt', account_id: str = 'Example#1234'):
@@ -434,7 +434,7 @@ def test_lossless_bundle_does_not_change_existing_download_modes():
     })
     assert separate.status_code == 200
     assert separate.headers['x-output-format'] == 'split'
-    assert b'downloadBundle' in client.get('/assets/app-v1.1.3.js').content
+    assert b'downloadBundle' in client.get('/assets/app-v1.1.4.js').content
     assert 'id="downloadBundle"' in client.get('/').text
     assert 'metadata archive' in client.get('/encrypt').text
 
@@ -495,7 +495,7 @@ def test_manifest_ui_and_asset_route():
     home = client.get('/').text
     assert 'id="downloadManifest"' in home
     assert 'Headers, footer' in home
-    app_js = client.get('/assets/app-v1.1.3.js')
+    app_js = client.get('/assets/app-v1.1.4.js')
     assert app_js.status_code == 200
     assert 'downloadFormat(\'manifest\')' in app_js.text
 

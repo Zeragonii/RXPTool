@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from webapp.package_crypto import PackageError, decrypt_package
 from webapp.import_bundle import BundleError, build_import_bundle, build_import_manifest, is_import_bundle, restore_original_import
 from webapp.native_encrypt import EncryptError, encrypt_payload, prepare_guides
+from webapp.manifest_rebuild import RebuildError, rebuild_from_manifest
 from rxp_decrypt import (
     DecodeError,
     decode_chunk,
@@ -30,7 +31,7 @@ from rxp_decrypt import (
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC = BASE_DIR / "static"
-MAX_REQUEST_BYTES = 24 * 1024 * 1024
+MAX_REQUEST_BYTES = 32 * 1024 * 1024
 MAX_PACKAGE_BYTES = 16 * 1024 * 1024
 MAX_PLAINTEXT_BYTES = 128 * 1024 * 1024
 MAX_GUIDES = 1000
@@ -75,13 +76,13 @@ async def protect_access(request: Request, call_next):
             headers={"WWW-Authenticate": 'Basic realm="RXP Decoder", charset="UTF-8"',
                      "Cache-Control": "no-store"},
         )
-    if request.url.path in ("/api/decrypt", "/api/encrypt", "/api/open-package") and request.method == "POST":
+    if request.url.path in ("/api/decrypt", "/api/encrypt", "/api/open-package", "/api/rebuild") and request.method == "POST":
         try:
             length = int(request.headers.get("content-length", "0"))
         except ValueError:
             return failure(400, "Invalid request length")
         if length > MAX_REQUEST_BYTES:
-            return failure(413, "Request too large (maximum 24 MiB)")
+            return failure(413, "Request too large (maximum 32 MiB)")
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Content-Security-Policy"] = (
@@ -124,8 +125,11 @@ async def asset(asset: str):
         # Versioned asset URLs prevent old JS and new HTML from being mixed
         # by browser or reverse-proxy caches after a release.
         "app-v1.1.3.css": "text/css",
+        "app-v1.1.4.css": "text/css",
         "encrypt-v1.1.3.js": "application/javascript",
+        "encrypt-v1.1.4.js": "application/javascript",
         "app-v1.1.3.js": "application/javascript",
+        "app-v1.1.4.js": "application/javascript",
         
         "favicon.svg": "image/svg+xml",
         "favicon-32.png": "image/png",
@@ -136,7 +140,7 @@ async def asset(asset: str):
         return failure(404, "Not found")
     # Both URLs serve the same canonical asset. Only the versioned URLs
     # are referenced by this release's HTML.
-    canonical = {"app-v1.1.3.css": "app.css", "app-v1.1.3.js": "app.js", "encrypt-v1.1.3.js": "encrypt.js"}.get(asset, asset)
+    canonical = {"app-v1.1.3.css": "app.css", "app-v1.1.3.js": "app.js", "encrypt-v1.1.3.js": "encrypt.js", "app-v1.1.4.css": "app.css", "app-v1.1.4.js": "app.js", "encrypt-v1.1.4.js": "encrypt.js"}.get(asset, asset)
     return FileResponse(STATIC / canonical, media_type=media)
 
 
@@ -212,7 +216,7 @@ async def bounded_json(request: Request) -> Any:
     data = bytearray()
     async for part in request.stream():
         if len(data) + len(part) > MAX_REQUEST_BYTES:
-            raise DecodeError("Request too large (maximum 24 MiB)")
+            raise DecodeError("Request too large (maximum 32 MiB)")
         data.extend(part)
     try:
         return json.loads(data)
@@ -376,3 +380,58 @@ async def encrypt_api(request: Request):
 @app.post("/api/open-package")
 async def open_package_api(request: Request):
     return await _package_endpoint(request, "open")
+
+
+def _rebuild_operation(account_id: str, manifest: bytes, plain: bytes):
+    try:
+        result, count, chunks, edited = rebuild_from_manifest(manifest, plain, account_id)
+        # Independent round-trip via the unchanged original decoder.
+        recovered, recovered_count = decode_payload(account_id, result)
+        if (recovered_count != chunks or b"\x00".join(recovered) != plain):
+            raise RebuildError("Rebuilt import did not pass unchanged decoder verification")
+        return result, count, chunks, edited
+    finally:
+        slots.release()
+
+
+@app.post("/api/rebuild")
+async def rebuild_api(request: Request):
+    if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
+        return failure(415, "Expected application/json")
+    try:
+        body = await bounded_json(request)
+        if not isinstance(body, dict):
+            raise RebuildError("Expected a JSON object")
+        account = body.get("battle_id")
+        if not isinstance(account, str) or not 1 <= len(account.strip().encode("utf-8")) <= 256:
+            raise RebuildError("Enter the original account ID")
+        source = body.get("content_base64")
+        manifest = body.get("manifest_base64")
+        if not isinstance(source, str) or not isinstance(manifest, str):
+            raise RebuildError("Upload both the combined plaintext TXT and manifest JSON")
+        if len(source) > 23 * 1024 * 1024 or len(manifest) > 6 * 1024 * 1024:
+            raise RebuildError("Uploaded plaintext or manifest exceeds size limits")
+        plain_data = base64.b64decode(source, validate=True)
+        manifest_data = base64.b64decode(manifest, validate=True)
+        if len(plain_data) > 16 * 1024 * 1024 or len(manifest_data) > 4 * 1024 * 1024:
+            raise RebuildError("Uploaded plaintext or manifest exceeds size limits")
+    except (DecodeError, RebuildError, binascii.Error, ValueError) as exc:
+        return failure(400, str(exc))
+    if not slots.acquire(blocking=False):
+        return failure(429, "Server is busy; retry shortly")
+    try:
+        result, count, chunk_count, edited = await run_in_threadpool(
+            _rebuild_operation, account.strip(), manifest_data, plain_data
+        )
+    except (RebuildError, DecodeError) as exc:
+        return failure(422, str(exc))
+    except Exception:
+        return failure(500, "Unexpected server error while rebuilding import")
+    return Response(
+        content=result.encode("utf-8"), media_type="text/plain; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="rebuilt_import.txt"',
+            "X-Guide-Count": str(count), "X-Chunk-Count": str(chunk_count),
+            "X-Import-Rebuilt": "true", "X-Source-Plaintext-Edited": str(edited).lower(),
+        },
+    )
