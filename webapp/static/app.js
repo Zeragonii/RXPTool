@@ -14,8 +14,12 @@
   const storageKey = 'rxp-decode-account-id';
   let mode = 'upload';
   let selectedFile = null;
-  let resultBlob = null;
-  let resultFilename = null;
+  // Only the browser holds the submitted payload between export requests.
+  // The server is stateless; choosing another format re-decrypts on demand.
+  let lastInput = null;
+  let exportCache = new Map();
+  let exportBusy = false;
+  let requestEpoch = 0;
 
   const setVisibility = (id, visible) => { byId(id).hidden = !visible; };
   const showError = (message) => { errorBox.textContent = message; errorBox.hidden = false; };
@@ -49,6 +53,7 @@
   });
   // Default to showing the ID so users can verify exactly which string is supplied.
   function selectMode(next) {
+    if (mode !== next) resetResult();
     mode = next;
     clearError();
     const upload = mode === 'upload';
@@ -64,6 +69,7 @@
   function chooseFile(file) {
     if (!file) return;
     if (file.size > maxFileSize) { showError('This file is too large. Maximum upload size is 16 MiB.'); return; }
+    resetResult();
     selectedFile = file;
     byId('fileTitle').textContent = file.name;
     byId('fileDescription').textContent = `${formatSize(file.size)} · Ready to decrypt`;
@@ -77,23 +83,105 @@
   for (const eventName of ['dragleave', 'drop']) dropZone.addEventListener(eventName, (event) => { event.preventDefault(); dropZone.classList.remove('dragging'); });
   dropZone.addEventListener('drop', (event) => chooseFile(event.dataTransfer?.files?.[0]));
   byId('clearFile').addEventListener('click', () => {
+    resetResult();
     selectedFile = null; fileInput.value = '';
     byId('fileTitle').textContent = 'Drop an encrypted payload here';
     byId('fileDescription').innerHTML = 'or <span class="browse-link">browse your files</span> to select a text export';
     setVisibility('clearFile', false);
   });
-  function resetResult() { resultBlob = null; resultFilename = null; setVisibility('emptyState', true); setVisibility('resultState', false); setVisibility('loadingState', false); }
-  function begin() { clearError(); resultBlob = null; resultFilename = null; setVisibility('emptyState', false); setVisibility('resultState', false); setVisibility('loadingState', true); submitBtn.disabled = true; submitLabel.textContent = 'Processing…'; }
-  function end() { submitBtn.disabled = false; submitLabel.textContent = 'Decrypt payload'; }
-  function downloadBlob() {
-    if (!resultBlob || !resultFilename) return;
-    const url = URL.createObjectURL(resultBlob);
+  const combinedBtn = byId('downloadCombined');
+  const splitBtn = byId('downloadSplit');
+  const exportStatus = byId('downloadStatus');
+
+  function resetResult() {
+    // If a different ID or payload is entered, discard previous output.
+    requestEpoch++;
+    lastInput = null;
+    exportCache = new Map();
+    exportStatus.classList.remove('error');
+    setVisibility('emptyState', true);
+    setVisibility('resultState', false);
+    setVisibility('loadingState', false);
+  }
+  function begin() {
+    clearError();
+    resetResult();
+    setVisibility('emptyState', false);
+    setVisibility('loadingState', true);
+    submitBtn.disabled = true;
+    submitLabel.textContent = 'Processing…';
+  }
+  function end() {
+    submitBtn.disabled = false;
+    submitLabel.textContent = 'Decrypt payload';
+  }
+  const setExportBusy = (busy) => {
+    exportBusy = busy;
+    combinedBtn.disabled = busy;
+    splitBtn.disabled = busy;
+    submitBtn.disabled = busy;
+  };
+  const setExportStatus = (message, error = false) => {
+    exportStatus.textContent = message;
+    exportStatus.classList.toggle('error', error);
+  };
+  function saveBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url; link.download = resultFilename; link.style.display = 'none';
+    link.href = url; link.download = filename; link.style.display = 'none';
     document.body.append(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 3000);
   }
-  byId('downloadBtn').addEventListener('click', downloadBlob);
+  async function fetchExport(input, outputFormat) {
+    const response = await fetch('/api/decrypt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...input, format: outputFormat }),
+      cache: 'no-store'
+    });
+    if (!response.ok) {
+      let message = `Request failed (HTTP ${response.status})`;
+      try { const data = await response.json(); message = data.error || message; } catch (_) {}
+      throw new Error(message);
+    }
+    const blob = await response.blob();
+    const count = Number(response.headers.get('X-Guide-Count') || 0);
+    const chunks = Number(response.headers.get('X-Chunk-Count') || 0);
+    const format = response.headers.get('X-Output-Format') || (count > 1 ? 'split' : 'combined');
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ||
+      (format === 'split' ? 'decrypted_guides.zip' : 'decrypted_guides.txt');
+    return { response, blob, filename, format, count, chunks };
+  }
+  async function downloadFormat(format) {
+    if (!lastInput || exportBusy || submitBtn.disabled) return;
+    let item = exportCache.get(format);
+    if (!item) {
+      const epoch = requestEpoch;
+      setExportBusy(true);
+      setExportStatus(format === 'combined' ? 'Preparing combined plaintext…' : 'Preparing split ZIP…');
+      try {
+        const result = await fetchExport(lastInput, format);
+        if (epoch !== requestEpoch) return; // Input changed while processing.
+        item = { blob: result.blob, filename: result.filename };
+        exportCache.set(format, item);
+      } catch (err) {
+        setExportStatus(err?.message || 'Unable to prepare the download.', true);
+        return;
+      } finally {
+        setExportBusy(false);
+      }
+    }
+    if (!item) return;
+    saveBlob(item.blob, item.filename);
+    setExportStatus(format === 'combined'
+      ? 'Downloaded one combined plaintext file.'
+      : 'Downloaded a ZIP of individual guide files.');
+  }
+  combinedBtn.addEventListener('click', () => downloadFormat('combined'));
+  splitBtn.addEventListener('click', () => downloadFormat('split'));
+  battleId.addEventListener('input', resetResult);
+  pastedText.addEventListener('input', resetResult);
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -104,43 +192,47 @@
     if (mode === 'upload') {
       if (!selectedFile) { showError('Choose an encrypted payload file first.'); return; }
       if (selectedFile.size > maxFileSize) { showError('This file is too large.'); return; }
-      payload = await selectedFile.text();
+      try { payload = await selectedFile.text(); }
+      catch (_) { showError('Unable to read the selected file.'); return; }
     } else payload = pastedText.value;
     if (!payload.trim()) { showError('The encrypted payload is empty.'); return; }
-    const req = JSON.stringify({ battle_id: id, payload });
-    if (new TextEncoder().encode(req).length > maxFileSize) { showError('The payload is too large for this server (16 MiB request limit).'); return; }
+    const input = { battle_id: id, payload };
+    const req = JSON.stringify({ ...input, format: 'auto' });
+    if (new TextEncoder().encode(req).length > maxFileSize) {
+      showError('The payload is too large for this server (16 MiB request limit).'); return;
+    }
     saveIfRequested();
     begin();
+    const epoch = requestEpoch;
     try {
-      const response = await fetch('/api/decrypt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: req, cache: 'no-store' });
-      if (!response.ok) {
-        let text = `Request failed (HTTP ${response.status})`;
-        try { const data = await response.json(); text = data.error || text; } catch (_) {}
-        throw new Error(text);
-      }
-      resultBlob = await response.blob();
-      const count = Number(response.headers.get('X-Guide-Count') || 0);
-      const chunks = Number(response.headers.get('X-Chunk-Count') || 0);
-      const disposition = response.headers.get('Content-Disposition') || '';
-      resultFilename = /filename="([^"]+)"/.exec(disposition)?.[1] || (count > 1 ? 'decrypted_guides.zip' : 'guide.txt');
+      const result = await fetchExport(input, 'auto');
+      if (epoch !== requestEpoch) return;
+      lastInput = input;
+      exportCache.set(result.format, { blob: result.blob, filename: result.filename });
       let names = [];
       try {
-        const encoded = response.headers.get('X-Guide-Preview') || '';
+        const encoded = result.response.headers.get('X-Guide-Preview') || '';
         const json = atob(encoded.replace(/-/g, '+').replace(/_/g, '/'));
         names = JSON.parse(json);
       } catch (_) {}
-      byId('guideCount').textContent = count.toLocaleString();
-      byId('chunkCount').textContent = chunks.toLocaleString();
-      byId('outputSize').textContent = formatSize(resultBlob.size);
-      byId('previewSuffix').textContent = count > names.length ? `FIRST ${names.length} OF ${count}` : `${count} TOTAL`;
+      byId('guideCount').textContent = result.count.toLocaleString();
+      byId('chunkCount').textContent = result.chunks.toLocaleString();
+      byId('outputSize').textContent = formatSize(result.blob.size);
+      byId('previewSuffix').textContent = result.count > names.length ?
+        `FIRST ${names.length} OF ${result.count}` : `${result.count} TOTAL`;
       const preview = byId('filePreview'); preview.replaceChildren();
-      for (const name of names) { const li = document.createElement('li'); li.append(docIcon(), document.createTextNode(name)); preview.append(li); }
-      byId('downloadText').textContent = count > 1 ? `Download ${count} guides (.zip)` : 'Download decrypted guide';
-      byId('downloadHint').textContent = count > 1 ? 'Each guide is a separate .txt file in the archive.' : 'Plaintext is saved as a .txt file.';
-      setVisibility('loadingState', false); setVisibility('resultState', true);
+      for (const name of names) {
+        const li = document.createElement('li');
+        li.append(docIcon(), document.createTextNode(name)); preview.append(li);
+      }
+      setExportStatus('Choose either format. You can download both without uploading again.');
+      setVisibility('loadingState', false);
+      setVisibility('resultState', true);
     } catch (err) {
-      resetResult();
-      showError(err?.message || 'Unable to process the payload.');
+      if (epoch === requestEpoch) {
+        resetResult();
+        showError(err?.message || 'Unable to process the payload.');
+      }
     } finally { end(); }
   });
 })();

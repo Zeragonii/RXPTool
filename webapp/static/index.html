@@ -28,7 +28,7 @@
         <div class="eyebrow"><span class="eyebrow-line"></span> YOUR PAYLOADS. YOUR SERVER.</div>
         <h1 id="title">Guides, <span>unlocked<br class="hero-break" /> into plaintext.</span></h1>
         <p>Upload an encrypted guide export, provide the account ID used to encrypt it, and recover clean guide files in one click.</p>
-        <div class="hero-points"><span><i aria-hidden="true">✓</i> Automatic guide splitting</span><span><i aria-hidden="true">✓</i> One-click ZIP export</span><span><i aria-hidden="true">✓</i> No server-side history</span></div>
+        <div class="hero-points"><span><i aria-hidden="true">✓</i> Choose your download format</span><span><i aria-hidden="true">✓</i> TXT or split ZIP export</span><span><i aria-hidden="true">✓</i> No server-side history</span></div>
       </section>
 
       <div class="main-grid">
@@ -80,16 +80,22 @@
               <div class="stats"><div><span>GUIDES</span><strong id="guideCount">—</strong></div><div><span>CHUNKS</span><strong id="chunkCount">—</strong></div><div><span>OUTPUT</span><strong id="outputSize">—</strong></div></div>
               <div class="result-label">RECOVERED FILES <span id="previewSuffix"></span></div>
               <ul id="filePreview" class="file-preview"></ul>
-              <button id="downloadBtn" class="download-btn" type="button"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v13m0 0 5-5m-5 5-5-5M4.5 17.5V19A2.5 2.5 0 0 0 7 21.5h10a2.5 2.5 0 0 0 2.5-2.5v-1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="downloadText">Download guides</span></button>
-              <p class="field-hint result-hint" id="downloadHint"></p>
+              <div class="export-label">CHOOSE YOUR DOWNLOAD</div>
+              <div class="export-actions">
+                <button id="downloadCombined" class="download-btn" type="button" aria-describedby="combinedHint"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3h8l4 4v14H6V3Zm8 0v5h4M9 12h6M9 16h6" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>Combined plaintext <small>One .txt file</small></span></button>
+                <button id="downloadSplit" class="download-btn download-btn-secondary" type="button" aria-describedby="splitHint"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 8h16v12H4V8Zm4-4h8l2 4H6l2-4ZM8 12h8M8 16h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Separate guides <small>ZIP of .txt files</small></span></button>
+              </div>
+              <p class="field-hint result-hint" id="combinedHint">Combined file uses NUL separators between guides.</p>
+              <p id="splitHint" class="sr-only">Each guide is a separate text file inside one ZIP archive.</p>
+              <p class="export-status" id="downloadStatus" role="status" aria-live="polite">Choose either format. No need to upload again.</p>
             </div>
           </section>
-          <section class="info-panel"><div class="info-icon">i</div><div><h3>How it works</h3><p>Uses the same account-derived cipher and zlib integrity checks as the Lua importer. If multiple guides are found, each one is exported as a separate file in a ZIP.</p></div></section>
+          <section class="info-panel"><div class="info-icon">i</div><div><h3>How it works</h3><p>Uses the same account-derived cipher and zlib integrity checks as the Lua importer. Choose between one combined plaintext file or a ZIP containing separate guides.</p></div></section>
           <section class="privacy-panel"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Private by design <small>No uploads saved or logged. Browser ID storage is opt-in.</small></span></section>
         </aside>
       </div>
     </main>
-    <footer><span>RXP Decoder <span class="footer-sep">/</span> v1.0</span><span>Independent utility · Not affiliated with RestedXP</span></footer>
+    <footer><span>RXP Decoder <span class="footer-sep">/</span> v1.0.1</span><span>Independent utility · Not affiliated with RestedXP</span></footer>
   </div>
 </body>
 </html>

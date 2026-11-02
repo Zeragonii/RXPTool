@@ -3,9 +3,9 @@
 # when the GHCR package is PUBLIC.
 # Set RXP_IMAGE, RXP_USERNAME and RXP_PASSWORD under Environment variables.
 services:
-  rxp-decrypt:
-    image: ${RXP_IMAGE:-ghcr.io/zeragonii/rxp-decrypt-web:latest}
-    container_name: rxp-decrypt
+  rxptool:
+    image: ${RXP_IMAGE:-ghcr.io/zeragonii/rxptool:latest}
+    container_name: rxptool
     restart: unless-stopped
     ports:
       - "8787:8787"

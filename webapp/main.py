@@ -134,13 +134,25 @@ def decode_payload(account_id: str, payload: str) -> tuple[list[bytes], int]:
     return guides, len(chunks)
 
 
-def package_output(guides: list[bytes], chunk_count: int) -> tuple[bytes, str, str, dict[str, str]]:
+def package_output(
+    guides: list[bytes], chunk_count: int, output_format: str = "auto"
+) -> tuple[bytes, str, str, dict[str, str]]:
     files = [guide_filename(guide, index) for index, guide in enumerate(guides, 1)]
-    if len(guides) == 1:
-        filename = files[0]
-        output = guides[0]
+    # "auto" preserves the v1.0.0 API: single guide -> .txt, many -> .zip.
+    # "combined" always returns one plaintext .txt with NUL guide delimiters.
+    # "split" always returns a ZIP, even for a single guide.
+    resolved_format = (
+        ("combined" if len(guides) == 1 else "split")
+        if output_format == "auto" else output_format
+    )
+    if resolved_format == "combined":
+        filename = (
+            files[0] if len(guides) == 1 and output_format == "auto"
+            else "decrypted_guides.txt"
+        )
+        output = b"\0".join(guides)
         content_type = "application/octet-stream"
-    else:
+    elif resolved_format == "split":
         filename = "decrypted_guides.zip"
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
@@ -148,6 +160,8 @@ def package_output(guides: list[bytes], chunk_count: int) -> tuple[bytes, str, s
                 archive.writestr(name, guide)
         output = buf.getvalue()
         content_type = "application/zip"
+    else:
+        raise ValueError("Unsupported output format")
     preview = base64.urlsafe_b64encode(
         json.dumps(files[:10], ensure_ascii=True, separators=(",", ":")).encode("ascii")
     ).decode("ascii")
@@ -156,6 +170,7 @@ def package_output(guides: list[bytes], chunk_count: int) -> tuple[bytes, str, s
     headers = {
         "Content-Disposition": f'attachment; filename="{safe_filename}"',
         "X-Guide-Count": str(len(guides)),
+        "X-Output-Format": resolved_format,
         "X-Chunk-Count": str(chunk_count),
         "X-Guide-Preview": preview,
     }
@@ -175,10 +190,10 @@ async def bounded_json(request: Request) -> Any:
         raise DecodeError("Invalid request data; expected JSON") from None
 
 
-def process_input(account_id: str, payload: str):
+def process_input(account_id: str, payload: str, output_format: str):
     try:
         guides, chunks = decode_payload(account_id, payload)
-        return package_output(guides, chunks)
+        return package_output(guides, chunks, output_format)
     finally:
         slots.release()
 
@@ -196,6 +211,9 @@ async def decrypt(request: Request):
     if not isinstance(body, dict):
         return failure(400, "Expected a JSON object")
     account_id, payload = body.get("battle_id"), body.get("payload")
+    output_format = body.get("format", "auto")
+    if output_format not in ("auto", "combined", "split"):
+        return failure(400, "Invalid export format; choose combined or split")
     if not isinstance(account_id, str) or not account_id.strip():
         return failure(400, "Enter the Battle.net ID used by the addon")
     if not 1 <= len(account_id.encode("utf-8")) <= 256:
@@ -206,7 +224,7 @@ async def decrypt(request: Request):
         return failure(429, "Decoder is busy; retry shortly")
     try:
         output, _filename, content_type, headers = await run_in_threadpool(
-            process_input, account_id.strip(), payload
+            process_input, account_id.strip(), payload, output_format
         )
     except DecodeError as exc:
         return failure(422, str(exc))

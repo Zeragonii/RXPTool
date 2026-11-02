@@ -86,3 +86,72 @@ def test_payload_checksum_check():
     response = client.post('/api/decrypt', json={'battle_id':'Tester#12345', 'payload': bad})
     assert response.status_code == 422
     assert 'checksum' in response.json()['error'].lower()
+
+
+def test_explicit_combined_export_preserves_nul_guide_boundaries():
+    guides = [
+        b'#group Test\n#name Alpha\nstep\n+Alpha\n',
+        b'#group Test\n#name Beta\nstep\n+Beta\n',
+        b'#group Test\n#name Gamma\nstep\n+Gamma\n',
+    ]
+    payload = encrypted(guides[0] + b'\0' + guides[1]) + '\n' + encrypted(guides[2])
+    response = client.post('/api/decrypt', json={
+        'battle_id': 'Tester#12345', 'payload': payload, 'format': 'combined'
+    })
+    assert response.status_code == 200, response.text
+    assert response.content == b'\0'.join(guides)
+    assert response.headers['x-output-format'] == 'combined'
+    assert response.headers['x-guide-count'] == '3'
+    assert response.headers['x-chunk-count'] == '2'
+    assert 'decrypted_guides.txt' in response.headers['content-disposition']
+    assert response.headers['content-type'] == 'application/octet-stream'
+
+
+def test_explicit_split_export_on_single_guide():
+    guide = b'#group Demo\n#name First guide\nstep\n+Hello\n'
+    response = client.post('/api/decrypt', json={
+        'battle_id': 'Tester#12345', 'payload': encrypted(guide), 'format': 'split'
+    })
+    assert response.status_code == 200, response.text
+    assert response.headers['x-guide-count'] == '1'
+    assert response.headers['x-output-format'] == 'split'
+    assert response.headers['content-type'] == 'application/zip'
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        names = archive.namelist()
+        assert names == [guide_filename(guide, 1)]
+        assert archive.read(names[0]) == guide
+
+
+def test_format_validation():
+    sample = encrypted(b'#group A\n#name B\nstep\n+hello\n')
+    for value in ('unknown', '', None, 123, ['split'], {'format': 'split'}):
+        response = client.post('/api/decrypt', json={
+            'battle_id': 'Tester#12345', 'payload': sample, 'format': value
+        })
+        assert response.status_code == 400
+        assert 'format' in response.json()['error'].lower()
+
+
+def test_auto_format_is_backward_compatible():
+    one = b'#group T\n#name One\nstep\n+Hello\n'
+    two = b'#group T\n#name Two\nstep\n+Hello\n'
+    single = client.post('/api/decrypt', json={
+        'battle_id': 'Tester#12345', 'payload': encrypted(one), 'format': 'auto'
+    })
+    assert single.status_code == 200
+    assert single.headers['x-output-format'] == 'combined'
+    assert single.content == one
+    multi = client.post('/api/decrypt', json={
+        'battle_id': 'Tester#12345', 'payload': encrypted(one+b'\0'+two), 'format': 'auto'
+    })
+    assert multi.status_code == 200
+    assert multi.headers['x-output-format'] == 'split'
+    assert multi.headers['content-type'] == 'application/zip'
+
+
+def test_export_selection_buttons_in_ui():
+    html = client.get('/').text
+    assert 'id="downloadCombined"' in html
+    assert 'id="downloadSplit"' in html
+    assert 'Combined plaintext' in html
+    assert 'Separate guides' in html
