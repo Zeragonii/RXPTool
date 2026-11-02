@@ -17,6 +17,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse, Response
 
 from webapp.package_crypto import PackageError, decrypt_package
+from webapp.import_bundle import BundleError, build_import_bundle, build_import_manifest, is_import_bundle, restore_original_import
 from webapp.native_encrypt import EncryptError, encrypt_payload, prepare_guides
 from rxp_decrypt import (
     DecodeError,
@@ -122,9 +123,9 @@ async def asset(asset: str):
         "app.js": "application/javascript",
         # Versioned asset URLs prevent old JS and new HTML from being mixed
         # by browser or reverse-proxy caches after a release.
-        "app-v1.1.1.css": "text/css",
-        "encrypt-v1.1.1.js": "application/javascript",
-        "app-v1.1.1.js": "application/javascript",
+        "app-v1.1.3.css": "text/css",
+        "encrypt-v1.1.3.js": "application/javascript",
+        "app-v1.1.3.js": "application/javascript",
         
         "favicon.svg": "image/svg+xml",
         "favicon-32.png": "image/png",
@@ -135,7 +136,7 @@ async def asset(asset: str):
         return failure(404, "Not found")
     # Both URLs serve the same canonical asset. Only the versioned URLs
     # are referenced by this release's HTML.
-    canonical = {"app-v1.1.1.css": "app.css", "app-v1.1.1.js": "app.js", "encrypt-v1.1.1.js": "encrypt.js"}.get(asset, asset)
+    canonical = {"app-v1.1.3.css": "app.css", "app-v1.1.3.js": "app.js", "encrypt-v1.1.3.js": "encrypt.js"}.get(asset, asset)
     return FileResponse(STATIC / canonical, media_type=media)
 
 
@@ -222,6 +223,29 @@ async def bounded_json(request: Request) -> Any:
 def process_input(account_id: str, payload: str, output_format: str):
     try:
         guides, chunks = decode_payload(account_id, payload)
+        if output_format == "manifest":
+            output = build_import_manifest(
+                payload, account_id, guides,
+                max_output_bytes=MAX_PLAINTEXT_BYTES, max_chunks=MAX_CHUNKS,
+            )
+            return output, "manifest.json", "application/json", {
+                "Content-Disposition": 'attachment; filename="manifest.json"',
+                "X-Guide-Count": str(len(guides)),
+                "X-Chunk-Count": str(chunks),
+                "X-Output-Format": "manifest",
+            }
+        if output_format == "bundle":
+            output = build_import_bundle(
+                payload, account_id, guides,
+                max_output_bytes=MAX_PLAINTEXT_BYTES, max_chunks=MAX_CHUNKS,
+            )
+            headers = {
+                "Content-Disposition": 'attachment; filename="rxptool_import_bundle.zip"',
+                "X-Guide-Count": str(len(guides)),
+                "X-Chunk-Count": str(chunks),
+                "X-Output-Format": "bundle",
+            }
+            return output, "rxptool_import_bundle.zip", "application/zip", headers
         return package_output(guides, chunks, output_format)
     finally:
         slots.release()
@@ -241,8 +265,8 @@ async def decrypt(request: Request):
         return failure(400, "Expected a JSON object")
     account_id, payload = body.get("battle_id"), body.get("payload")
     output_format = body.get("format", "auto")
-    if output_format not in ("auto", "combined", "split"):
-        return failure(400, "Invalid export format; choose combined or split")
+    if output_format not in ("auto", "combined", "split", "bundle", "manifest"):
+        return failure(400, "Invalid export format; choose combined, split, manifest or bundle")
     if not isinstance(account_id, str) or not account_id.strip():
         return failure(400, "Enter the Battle.net ID used by the addon")
     if not 1 <= len(account_id.encode("utf-8")) <= 256:
@@ -255,7 +279,7 @@ async def decrypt(request: Request):
         output, _filename, content_type, headers = await run_in_threadpool(
             process_input, account_id.strip(), payload, output_format
         )
-    except DecodeError as exc:
+    except (DecodeError, BundleError) as exc:
         return failure(422, str(exc))
     except Exception:
         # Don't reflect sensitive inputs or stack traces to the UI.
@@ -292,6 +316,16 @@ def _validate_package_input(body: Any) -> tuple[str, bytes, str]:
 def _package_operation(action: str, account_id: str, data: bytes, filename: str):
     try:
         if action == "encrypt":
+            # A metadata bundle from Decrypt can be restored *exactly*, but only
+            # when both the original ID and all archived bytes still match.
+            if filename.lower().endswith("rxptool_import_bundle.zip") or is_import_bundle(data):
+                original, guide_count = restore_original_import(
+                    data, account_id, decode_payload,
+                )
+                return original, "restored_original_payload.txt", "text/plain; charset=utf-8", {
+                    "X-Package-Verified": "true", "X-Input-Bytes": str(len(data)),
+                    "X-Guide-Count": str(guide_count), "X-Payload-Restored": "exact",
+                }
             plain, guide_count = prepare_guides(data, filename)
             result = encrypt_payload(plain, account_id)
             # Verify using the exact decoder that powers the main Decrypt page.
@@ -325,7 +359,7 @@ async def _package_endpoint(request: Request, action: str):
         output, out_name, media, headers = await run_in_threadpool(
             _package_operation, action, account_id, data, filename
         )
-    except (PackageError, EncryptError, DecodeError) as exc:
+    except (PackageError, EncryptError, DecodeError, BundleError) as exc:
         return failure(422, str(exc))
     except Exception:
         return failure(500, "Unexpected server error while handling package")

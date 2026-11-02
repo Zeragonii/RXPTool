@@ -7,7 +7,7 @@
     'decryptForm', 'battleId', 'rememberId', 'payloadFile', 'payloadText',
     'error', 'submitBtn', 'submitLabel', 'dropZone', 'showId', 'tabUpload',
     'tabPaste', 'uploadPanel', 'pastePanel', 'clearFile', 'fileTitle',
-    'fileDescription', 'downloadCombined', 'downloadSplit', 'downloadStatus',
+    'fileDescription', 'downloadCombined', 'downloadSplit', 'downloadManifest', 'downloadBundle', 'downloadStatus',
     'emptyState', 'resultState', 'loadingState', 'guideCount', 'chunkCount',
     'outputSize', 'previewSuffix', 'filePreview'
   ];
@@ -113,6 +113,8 @@
   });
   const combinedBtn = byId('downloadCombined');
   const splitBtn = byId('downloadSplit');
+  const bundleBtn = byId('downloadBundle');
+  const manifestBtn = byId('downloadManifest');
   const exportStatus = byId('downloadStatus');
 
   function resetResult() {
@@ -141,6 +143,8 @@
     exportBusy = busy;
     combinedBtn.disabled = busy;
     splitBtn.disabled = busy;
+    bundleBtn.disabled = busy;
+    manifestBtn.disabled = busy;
     submitBtn.disabled = busy;
   };
   const setExportStatus = (message, error = false) => {
@@ -172,7 +176,7 @@
     const format = response.headers.get('X-Output-Format') || (count > 1 ? 'split' : 'combined');
     const disposition = response.headers.get('Content-Disposition') || '';
     const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ||
-      (format === 'split' ? 'decrypted_guides.zip' : 'decrypted_guides.txt');
+      (format === 'manifest' ? 'manifest.json' : format === 'bundle' ? 'rxptool_import_bundle.zip' : format === 'split' ? 'decrypted_guides.zip' : 'decrypted_guides.txt');
     return { response, blob, filename, format, count, chunks };
   }
   async function downloadFormat(format) {
@@ -181,7 +185,7 @@
     if (!item) {
       const epoch = requestEpoch;
       setExportBusy(true);
-      setExportStatus(format === 'combined' ? 'Preparing combined plaintext…' : 'Preparing split ZIP…');
+      setExportStatus(format === 'manifest' ? 'Recording import framing and every NUL position…' : format === 'bundle' ? 'Preserving original import and metadata…' : format === 'combined' ? 'Preparing combined plaintext…' : 'Preparing split ZIP…');
       try {
         const result = await fetchExport(lastInput, format);
         if (epoch !== requestEpoch) return; // Input changed while processing.
@@ -196,12 +200,18 @@
     }
     if (!item) return;
     saveBlob(item.blob, item.filename);
-    setExportStatus(format === 'combined'
+    setExportStatus(format === 'manifest'
+      ? 'Downloaded manifest.json with raw header/footer text and zero-based NUL byte offsets.'
+      : format === 'bundle'
+      ? 'Downloaded a lossless archive containing the original import, metadata and guides.'
+      : format === 'combined'
       ? 'Downloaded one combined plaintext file.'
       : 'Downloaded a ZIP of individual guide files.');
   }
   combinedBtn.addEventListener('click', () => downloadFormat('combined'));
   splitBtn.addEventListener('click', () => downloadFormat('split'));
+  bundleBtn.addEventListener('click', () => downloadFormat('bundle'));
+  manifestBtn.addEventListener('click', () => downloadFormat('manifest'));
   battleId.addEventListener('input', resetResult);
   pastedText.addEventListener('input', resetResult);
 
@@ -247,7 +257,7 @@
         const li = document.createElement('li');
         li.append(docIcon(), document.createTextNode(name)); preview.append(li);
       }
-      setExportStatus('Choose either format. You can download both without uploading again.');
+      setExportStatus('Choose plaintext, split files, standalone JSON manifest, or the lossless archive.');
       setVisibility('loadingState', false);
       setVisibility('resultState', true);
     } catch (err) {

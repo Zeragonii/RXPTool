@@ -190,20 +190,20 @@ def test_versioned_asset_urls_and_strict_csp():
 
     page = client.get('/')
     assert page.status_code == 200
-    assert 'src="/assets/app-v1.1.1.js"' in page.text
-    assert 'href="/assets/app-v1.1.1.css"' in page.text
-    assert 'v1.1.1' in page.text
+    assert 'src="/assets/app-v1.1.3.js"' in page.text
+    assert 'href="/assets/app-v1.1.3.css"' in page.text
+    assert 'v1.1.3' in page.text
     assert not re.search(r'<script(?![^>]*\bsrc=)', page.text, flags=re.I)
     assert "script-src 'self'" in page.headers['content-security-policy']
     assert "'unsafe-inline'" not in page.headers['content-security-policy']
-    for asset, media in [('app-v1.1.1.js', 'application/javascript'), ('app-v1.1.1.css', 'text/css')]:
+    for asset, media in [('app-v1.1.3.js', 'application/javascript'), ('app-v1.1.3.css', 'text/css')]:
         response = client.get('/assets/' + asset)
         assert response.status_code == 200
         assert response.headers['content-type'].startswith(media)
         assert response.headers['cache-control'] == 'no-store'
-        assert response.content == client.get('/assets/' + asset.replace('-v1.1.1', '')).content
-    assert 'downloadCombined' in client.get('/assets/app-v1.1.1.js').text
-    assert "missingIds" in client.get('/assets/app-v1.1.1.js').text
+        assert response.content == client.get('/assets/' + asset.replace('-v1.1.3', '')).content
+    assert 'downloadCombined' in client.get('/assets/app-v1.1.3.js').text
+    assert "missingIds" in client.get('/assets/app-v1.1.3.js').text
     assert client.get('/assets/app-v1.0.3.js').status_code == 404
 
 
@@ -215,10 +215,10 @@ def test_encrypt_page_has_separate_route_and_navigation():
     assert 'id="encryptForm"' in page.text
     assert 'id="recoveryForm"' in page.text  # old .rxptool recovery is retained
     assert 'Compatible with the Decrypt page' in page.text
-    assert 'src="/assets/encrypt-v1.1.1.js"' in page.text
+    assert 'src="/assets/encrypt-v1.1.3.js"' in page.text
     assert '<script>' not in page.text
-    assert client.get('/assets/encrypt-v1.1.1.js').status_code == 200
-    assert 'encryptGuideCount' in client.get('/assets/encrypt-v1.1.1.js').text
+    assert client.get('/assets/encrypt-v1.1.3.js').status_code == 200
+    assert 'encryptGuideCount' in client.get('/assets/encrypt-v1.1.3.js').text
 
 
 def _encrypt_via_api(data: bytes, filename: str = 'guides.txt', account_id: str = 'Example#1234'):
@@ -342,3 +342,178 @@ def test_package_crypto_legacy_unit_rejects_truncated_and_wrong_format():
             decrypt_package(invalid, 'example#1')
     with pytest.raises(PackageError):
         encrypt_package(b'a' * (16 * 1024 * 1024 + 1), 'example#1', 'a.txt')
+
+
+def _bundle_for(payload: str, identifier: str = 'Tester#12345'):
+    return client.post('/api/decrypt', json={
+        'battle_id': identifier, 'payload': payload, 'format': 'bundle'
+    })
+
+
+def _restore_bundle(archive: bytes, identifier: str = 'Tester#12345'):
+    return client.post('/api/encrypt', json={
+        'battle_id': identifier, 'filename': 'rxptool_import_bundle.zip',
+        'content_base64': base64.b64encode(archive).decode('ascii')
+    })
+
+
+def _rewrite_zip(data: bytes, filename: str, replacement: bytes) -> bytes:
+    output = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(data)) as zin, zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as zout:
+        for name in zin.namelist():
+            zout.writestr(name, replacement if name == filename else zin.read(name))
+    return output.getvalue()
+
+
+def test_lossless_bundle_recovers_identical_multi_chunk_original_import():
+    guides = [
+        b'#group A\n#name One\nstep\n+one\n',
+        b'#group A\n#name Two\nstep\n+two\n',
+        b'#group A\n#name Three\nstep\n+three\n',
+    ]
+    # Header, footer, arbitrary line breaks and chunk boundaries are preserved.
+    payload = '\n3|' + encrypted(guides[0] + b'\0\0' + guides[1] + b'\0') + '\n' + encrypted(guides[2]) + '|40000\n'
+    bundle = _bundle_for(payload)
+    assert bundle.status_code == 200, bundle.text
+    assert bundle.headers['x-output-format'] == 'bundle'
+    assert bundle.headers['x-chunk-count'] == '2'
+    with zipfile.ZipFile(io.BytesIO(bundle.content)) as archive:
+        manifest = json.loads(archive.read('manifest.json'))
+        assert manifest['schema_version'] == 1
+        assert manifest['source']['import_version'] == 40000
+        assert manifest['source']['declared_guide_count'] == 3
+        assert manifest['guides']['count'] == 3
+        assert len(manifest['chunks']) == 2
+        assert archive.read('decrypted_guides.txt') == b'\0'.join(guides)
+        assert archive.read('chunks/chunk_001.bin') == guides[0] + b'\0\0' + guides[1] + b'\0'
+        assert archive.read('original_payload.txt') == payload.encode()
+        assert b'Tester#12345' not in archive.read('manifest.json')
+    restored = _restore_bundle(bundle.content)
+    assert restored.status_code == 200, restored.text
+    assert restored.headers['x-payload-restored'] == 'exact'
+    assert restored.content == payload.encode()
+    # The normal decoder can still recover it with no modifications.
+    dec = client.post('/api/decrypt', json={'battle_id': 'Tester#12345', 'payload': restored.text, 'format': 'combined'})
+    assert dec.status_code == 200
+    assert dec.content == b'\0'.join(guides)
+
+
+def test_lossless_bundle_rejects_wrong_id_and_tampered_plaintext():
+    payload = encrypted(b'#group Demo\n#name One\nstep\n+test\n')
+    original = _bundle_for(payload)
+    assert original.status_code == 200
+    wrong = _restore_bundle(original.content, 'Wrong#55555')
+    assert wrong.status_code == 422
+    assert 'original id' in wrong.json()['error'].lower()
+    altered = _rewrite_zip(original.content, 'decrypted_guides.txt', b'not the original content')
+    failed = _restore_bundle(altered)
+    assert failed.status_code == 422
+    assert 'modified' in failed.json()['error'].lower()
+
+
+def test_lossless_bundle_rejects_modified_original_ciphertext():
+    payload = encrypted(b'#group Demo\n#name One\nstep\n+test\n')
+    original = _bundle_for(payload)
+    assert original.status_code == 200
+    altered = _rewrite_zip(original.content, 'original_payload.txt', b'invalid')
+    failed = _restore_bundle(altered)
+    assert failed.status_code == 422
+    assert 'modified' in failed.json()['error'].lower()
+
+
+def test_lossless_bundle_does_not_change_existing_download_modes():
+    guide = b'#group Demo\n#name One\nstep\n+test\n'
+    payload = encrypted(guide)
+    combined = client.post('/api/decrypt', json={
+        'battle_id': 'Tester#12345', 'payload': payload, 'format': 'combined'
+    })
+    assert combined.status_code == 200
+    assert combined.content == guide
+    separate = client.post('/api/decrypt', json={
+        'battle_id': 'Tester#12345', 'payload': payload, 'format': 'split'
+    })
+    assert separate.status_code == 200
+    assert separate.headers['x-output-format'] == 'split'
+    assert b'downloadBundle' in client.get('/assets/app-v1.1.3.js').content
+    assert 'id="downloadBundle"' in client.get('/').text
+    assert 'metadata archive' in client.get('/encrypt').text
+
+
+def test_standalone_manifest_preserves_header_footer_and_all_nuls():
+    raw_one = b"\0#group A\n#name First\nstep\n+first\n\0\0#group A\n#name Second\nstep\n+second\n\0"
+    raw_two = b"#group A\n#name Third\nstep\n+third\n\0\0"
+    payload = "\n3|" + encrypted(raw_one) + " \n" + encrypted(raw_two) + "|40000\n"
+    result = client.post('/api/decrypt', json={
+        'battle_id': 'Tester#12345', 'payload': payload, 'format': 'manifest'
+    })
+    assert result.status_code == 200, result.text
+    assert result.headers['x-output-format'] == 'manifest'
+    assert 'manifest.json' in result.headers['content-disposition']
+    metadata = result.json()
+    assert metadata['source']['framing']['input_kind'] == 'framed-import'
+    assert metadata['source']['framing']['header'] == {'raw': '\n3|', 'declared_guide_count': 3}
+    assert metadata['source']['framing']['footer'] == {'raw': '|40000\n', 'addon_version': 40000}
+    assert metadata['source']['framing']['inter_chunk_text'] == [' \n']
+    assert metadata['chunks'][0]['nul_byte_offsets_0_based'] == [i for i, b in enumerate(raw_one) if b == 0]
+    assert metadata['chunks'][1]['nul_byte_offsets_0_based'] == [i for i, b in enumerate(raw_two) if b == 0]
+    assert metadata['chunks'][0]['raw_stream_start_byte_0_based'] == 0
+    assert metadata['chunks'][1]['raw_stream_start_byte_0_based'] == len(raw_one)
+    assert metadata['offsets']['raw_chunks_concatenated_nul_byte_offsets_0_based'] == [
+        i for i, b in enumerate(raw_one + raw_two) if b == 0
+    ]
+    combined = b'\0'.join(g for raw in [raw_one, raw_two] for g in raw.split(b'\0') if g)
+    assert metadata['offsets']['normalized_combined_nul_byte_offsets_0_based'] == [
+        i for i, b in enumerate(combined) if b == 0
+    ]
+    assert len(metadata['offsets']['raw_chunks_concatenated_nul_byte_offsets_0_based']) > len(metadata['offsets']['normalized_combined_nul_byte_offsets_0_based'])
+    assert b'Tester#12345' not in result.content
+    archive = _bundle_for(payload)
+    assert archive.status_code == 200, archive.text
+    with zipfile.ZipFile(io.BytesIO(archive.content)) as zf:
+        assert zf.read('manifest.json') == result.content
+    restored = _restore_bundle(archive.content)
+    assert restored.status_code == 200, restored.text
+    assert restored.content.decode() == payload
+
+
+def test_raw_chunk_manifest_does_not_invent_header_footer():
+    data = b'#group Test\n#name Solo\nstep\n+hello\n'
+    result = client.post('/api/decrypt', json={
+        'battle_id': 'Tester#12345', 'payload': encrypted(data), 'format': 'manifest'
+    })
+    assert result.status_code == 200
+    meta = result.json()
+    assert meta['source']['framing']['input_kind'] == 'chunk-data'
+    assert meta['source']['framing']['header']['raw'] is None
+    assert meta['source']['framing']['footer']['raw'] is None
+    assert meta['source']['framing']['header']['declared_guide_count'] is None
+    assert meta['source']['framing']['footer']['addon_version'] is None
+    assert meta['offsets']['raw_chunks_concatenated_nul_byte_offsets_0_based'] == []
+
+
+def test_manifest_ui_and_asset_route():
+    home = client.get('/').text
+    assert 'id="downloadManifest"' in home
+    assert 'Headers, footer' in home
+    app_js = client.get('/assets/app-v1.1.3.js')
+    assert app_js.status_code == 200
+    assert 'downloadFormat(\'manifest\')' in app_js.text
+
+
+def test_archive_detects_altered_offsets_and_literal_framing():
+    raw = b'\0#group A\n#name B\nstep\n+hi\n\0\0'
+    payload = '1|' + encrypted(raw) + '|40000'
+    orig = _bundle_for(payload)
+    assert orig.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(orig.content)) as zf:
+        manifest = json.loads(zf.read('manifest.json'))
+    manifest['chunks'][0]['nul_byte_offsets_0_based'] = [1,2]
+    tampered = _rewrite_zip(orig.content, 'manifest.json', json.dumps(manifest).encode())
+    response = _restore_bundle(tampered)
+    assert response.status_code == 422
+    assert 'nul separator' in response.json()['error'].lower()
+    manifest['chunks'][0]['nul_byte_offsets_0_based'] = [i for i, b in enumerate(raw) if b == 0]
+    manifest['source']['framing']['header']['raw'] = '2|'
+    response = _restore_bundle(_rewrite_zip(orig.content, 'manifest.json', json.dumps(manifest).encode()))
+    assert response.status_code == 422
+    assert 'header/footer' in response.json()['error'].lower()

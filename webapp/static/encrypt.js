@@ -6,7 +6,7 @@
     'encryptError', 'encryptSubmit', 'encryptSubmitLabel', 'encryptEmpty',
     'encryptLoading', 'encryptResult', 'encryptInputSize', 'encryptOutputSize', 'encryptGuideCount',
     'downloadEncrypted', 'recoveryForm', 'recoverFile', 'recoverError',
-    'recoverSubmit', 'recoverStatus', 'toggleEncryptId'];
+    'recoverSubmit', 'recoverStatus', 'toggleEncryptId', 'encryptSuccessTitle', 'encryptSuccessSubtitle', 'encryptResultHint'];
   const missing = ids.filter((name) => !byId(name));
   if (missing.length) {
     const error = document.createElement('p');
@@ -81,8 +81,8 @@
   drop.addEventListener('drop', (event) => chooseFile(event.dataTransfer?.files?.[0]));
   byId('clearEncryptFile').addEventListener('click', () => {
     file = null; upload.value = ''; reset();
-    byId('encryptFileTitle').textContent = 'Drop your plaintext guide file here';
-    byId('encryptFileDescription').textContent = 'or browse your files to upload a combined TXT or split ZIP';
+    byId('encryptFileTitle').textContent = 'Drop plaintext or a metadata archive here';
+    byId('encryptFileDescription').textContent = 'or browse your files to upload combined TXT, split ZIP, or a metadata archive';
     show('clearEncryptFile', false); clearError(error);
   });
 
@@ -112,7 +112,7 @@
     }
     const disposition = response.headers.get('Content-Disposition') || '';
     const match = disposition.match(/filename="([^"]+)"/);
-    return { blob: await response.blob(), filename: safeFile(match?.[1] || 'encrypted_guides.txt'), guideCount: response.headers.get('X-Guide-Count') };
+    return { blob: await response.blob(), filename: safeFile(match?.[1] || 'encrypted_guides.txt'), guideCount: response.headers.get('X-Guide-Count'), exactRestore: response.headers.get('X-Payload-Restored') === 'exact' };
   }
 
   function downloadFile(result) {
@@ -138,6 +138,9 @@
       const result = await requestPackage('/api/encrypt', id, file);
       if (epoch !== operationId) return;
       download = result;
+      byId('encryptSuccessTitle').textContent = result.exactRestore ? 'Original import restored' : 'Round-trip verified';
+      byId('encryptSuccessSubtitle').textContent = result.exactRestore ? 'Byte-for-byte original payload' : 'Compatible with the Decrypt page';
+      byId('encryptResultHint').textContent = result.exactRestore ? 'This is the original, unmodified encrypted import preserved in your metadata archive. No re-encryption or account-ID changes were performed.' : 'On the Decrypt page, upload this .txt payload and enter the same ID. Individual guides and their contents will be recovered; combined separators are canonicalised.';
       byId('encryptInputSize').textContent = sizeLabel(file.size);
       byId('encryptOutputSize').textContent = sizeLabel(result.blob.size);
       byId('encryptGuideCount').textContent = result.guideCount || '—';

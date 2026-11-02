@@ -1,6 +1,6 @@
 # RXPTool — Self-hosted Guide Encrypt / Decrypt
 
-A small, stateless, self-hosted browser UI for the included account-keyed guide payload decoder. Upload or paste an encrypted guide string, supply its matching identifier, and download decrypted plaintext. After decryption, choose either one NUL-delimited plaintext file or a ZIP containing individual guide text files. Both export formats are available without uploading the payload again. Optionally remember the identifier in your browser's `localStorage` (not on the server).
+A small, stateless, self-hosted browser UI for the included account-keyed guide payload decoder. Upload or paste an encrypted guide string, supply its matching identifier, and download decrypted plaintext. After decryption, choose a combined plaintext file, separate guide files, or a lossless import-and-metadata archive for exact restoration. Both export formats are available without uploading the payload again. Optionally remember the identifier in your browser's `localStorage` (not on the server).
 
 > **Use only with data you have the right to access.** The software requires the matching account ID and does not attempt to recover unknown keys or bypass account-mismatch checks. The precise ID expected by the addon depends on its build; a displayed BattleTag may not always be that ID. This project is not affiliated with RestedXP.
 
@@ -12,11 +12,42 @@ A small, stateless, self-hosted browser UI for the included account-keyed guide 
 - Optional browser-only ID remembrance; no accounts database or persistent payload storage.
 - Existing Python decoder (`rxp_decrypt.py`) used directly by the FastAPI backend.
 - Matching **Encrypt** workspace: convert combined plaintext TXT or split ZIP guides into Base64-encoded payload text that the main **Decrypt** page accepts with the same ID. Legacy AES `.rxptool` recovery is retained for v1.1.0 files.
-- **v1.0.1: Choose your export:** download a combined NUL-delimited `decrypted_guides.txt` or a ZIP of individually named `.txt` guide files. Download both if you like; the alternative format is generated on demand without re-uploading.
-- The API accepts an optional `format` parameter: `combined`, `split`, or `auto` (the backward-compatible default). `auto` keeps the v1.0.0 behaviour: single guide → `.txt`, multiple guides → ZIP.
+- **v1.1.3: Inspect original byte offsets:** a standalone `manifest.json` download records exact NUL separator offsets in each original chunk, plus literal outer header and footer text and the count/version fields when present. The lossless archive includes the same expanded manifest.
+- **v1.1.2: Preserve import metadata:** download a lossless archive, then restore the original encrypted payload with its original matching ID.
+- **v1.0.1: Choose your export:** download a combined NUL-delimited `decrypted_guides.txt` or a ZIP of individually named `.txt` guide files. Download any or all formats; alternatives are generated on demand without re-uploading.
+- The API accepts an optional `format` parameter: `combined`, `split`, `manifest`, `bundle`, or `auto` (the backward-compatible default). `auto` keeps the v1.0.0 behaviour: single guide → `.txt`, multiple guides → ZIP.
 - Input validation, integrity checks, request caps, concurrent-operation limit, and error feedback.
 - Optional HTTP Basic authentication (`RXP_USERNAME` and `RXP_PASSWORD` must be supplied together).
 - Health endpoint `/health`, nonroot Docker user, read-only filesystem and minimal container privileges.
+
+## v1.1.3 — Inspectable header/footer and NUL separator manifest
+
+After a successful decryption, click **Manifest JSON** to download a *separate* `manifest.json`, without downloading the archive. The same expanded manifest is inside **Download with metadata**. It contains:
+
+- `source.framing.header.raw`: literal text before the first encrypted chunk (for example `"\n3|"`).
+- `source.framing.footer.raw`: literal text after the final encrypted chunk (for example `"|40000\n"`).
+- `source.framing.header.declared_guide_count` and `.footer.addon_version` when detectable; `null` if you uploaded only a standalone chunk or Base64 instead of a full import.
+- `chunks[].nul_byte_offsets_0_based`: **all** NUL positions in the exact decompressed bytes of the corresponding chunk, including consecutive or trailing NULs.
+- `chunks[].raw_stream_start_byte_0_based` / `raw_stream_end_byte_exclusive`: chunk boundaries within the conceptual concatenation of original decompressed chunks.
+- `offsets.raw_chunks_concatenated_nul_byte_offsets_0_based`: original NUL positions across the concatenated raw decompressed chunks.
+- `offsets.normalized_combined_nul_byte_offsets_0_based`: NUL positions in the ordinary `decrypted_guides.txt` download (this differs if original chunks had extra leading, consecutive or trailing NUL bytes).
+
+All offsets are **zero-based byte positions**, not character indices. The file also contains original checksums, chunk order, hashes and source character spans. No cleartext Battle.net ID is stored. If the supplied input has no outer header or footer, these fields are reported as `null` rather than invented. This is an inspectable record; it does not independently prove entitlement or licence validation by another addon.
+
+## v1.1.2 — Exact import preservation using metadata bundles
+
+The **Decrypt** page now has a third download choice: **Download with metadata**. The resulting `rxptool_import_bundle.zip` contains:
+
+- `manifest.json`: guide and chunk counts, original declared guide count and addon version (when present), chunk checksums, byte lengths, SHA-256 hashes, and an account-key fingerprint (**not** the cleartext Battle.net ID).
+- `original_payload.txt`: the entire original submitted import string, including headers, version footer, all encrypted chunks and original whitespace, unchanged.
+- `decrypted_guides.txt`: the regular combined NUL-separated plaintext guides.
+- `chunks/chunk_###.bin`: exact uncompressed byte data per original encrypted chunk, preserving boundaries and any extra NUL separators lost in the regular combined TXT export.
+
+To restore: open **Encrypt**, enter the **same original ID**, upload `rxptool_import_bundle.zip`, and click **Encrypt guides**. RXPTool detects the bundle and verifies that all archived data agrees with the original encrypted import under that ID. It returns `restored_original_payload.txt`, **byte-for-byte identical to the original submitted string**. In this mode RXPTool restores the stored original; it does **not re-encrypt with a different ID**, alter account binding, or change/check third-party entitlements. If you edit any part of the archive, exact restoration is rejected. Use the existing TXT/ZIP encryption path for original/authorised content whose guide text has been edited; these newly generated chunks may not reproduce a previous full import or pass the third-party addon's external validation.
+
+The archive includes plaintext guide content: **keep it private**. Files and IDs are still processed in memory, and the ID is only stored in the browser when the user opts in. The archive itself does not include the cleartext ID.
+
+API: `POST /api/decrypt` with `format: "bundle"` returns the archive. `POST /api/encrypt` with that ZIP as the upload returns the original import and includes `X-Payload-Restored: exact`. The original `combined`, `split`, and `auto` modes continue to work unchanged.
 
 ## v1.1.1 — Encrypt ↔ Decrypt compatibility
 
@@ -60,7 +91,7 @@ The GHCR image is **based on the repository's actual `owner/repo`**, converted t
 ```text
 ghcr.io/zeragonii/rxptool:latest
 ghcr.io/zeragonii/rxptool:edge
-ghcr.io/zeragonii/rxptool:1.1.1
+ghcr.io/zeragonii/rxptool:1.1.3
 ```
 
 The GitHub Actions workflow uses the repository's built-in `GITHUB_TOKEN` with `packages: write` for GHCR and `contents: write` for GitHub Releases. **No PAT or container registry password is needed in repository secrets.** GitHub packages can initially be **private**; after the first successful publish, go to your package's **Package settings → Change visibility → Public** if you want Portainer to pull without a registry login. Alternatively, keep the image private and configure GHCR registry credentials in Portainer. Ensure the GHCR package grants this repository permission to publish if a package with the same name already exists. See [GitHub's GHCR guide](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
@@ -69,14 +100,14 @@ The GitHub Actions workflow uses the repository's built-in `GITHUB_TOKEN` with `
 
 Your existing repository is [`Zeragonii/RXPTool`](https://github.com/Zeragonii/RXPTool). Copy the updated files from this archive over your checked-out copy, preserving its `.git/` folder. Do **not** run `git init` or add a new remote.
 
-This release changes `VERSION` to `1.1.1`. From the repository root:
+This release changes `VERSION` to `1.1.2`. From the repository root:
 
 ```powershell
 git add .
-git commit -m "v1.1.1"
+git commit -m "v1.1.2"
 git push
-git tag v1.1.1
-git push origin v1.1.1
+git tag v1.1.2
+git push origin v1.1.2
 ```
 
 Pushing `main` builds `:edge`. The new tag builds `:1.1.1` and `:latest` and creates the release. Don't reuse an existing tag.
@@ -97,7 +128,7 @@ git push origin v1.1.2
 
 ### C. Deploy to Portainer (image published by GitHub)
 
-Once the `v1.1.1` workflow is green and the GHCR image is accessible to Portainer:
+Once the `v1.1.2` workflow is green and the GHCR image is accessible to Portainer:
 
 1. **Portainer → Stacks → Add stack → Web editor**.
 2. Paste [`portainer-stack.yml`](portainer-stack.yml) into the editor.

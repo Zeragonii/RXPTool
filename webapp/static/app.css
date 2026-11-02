@@ -40,3 +40,8 @@
 .recovery-panel .download-btn{margin-top:16px}.recovery-panel .error-box{margin-top:13px}.stats strong{overflow-wrap:anywhere}.notice-bar span{min-width:0}
 @media(max-width:780px){.topbar{gap:12px}.header-actions{gap:9px}.status{display:none}.site-nav{gap:3px}.nav-link{padding:7px 10px}.notice-bar{flex-direction:column;gap:3px;margin-top:0}}
 @media(max-width:430px){.brand-label{font-size:17px}.brand-icon{width:37px;height:37px}.nav-link{font-size:11px;padding:7px 9px}}
+
+/* v1.1.2: archival export occupies the full width beneath normal exports. */
+.export-actions #downloadBundle{grid-column:1 / -1;flex-direction:row;min-height:63px}
+.export-actions #downloadBundle span{text-align:left}
+@media(max-width:400px){.export-actions #downloadBundle{justify-content:flex-start}}
