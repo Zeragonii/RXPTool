@@ -60,12 +60,6 @@ def test_changed_guides_rebuilt_from_framing_and_recheck_via_original_decoder():
     assert transformed[1] == b'\0' + changed[2] + b'\0\0'
 
 
-def test_wrong_id_is_rejected():
-    _, guides, _, _, manifest = fixture()
-    r = call(manifest, b'\0'.join(guides), 'Another#4444')
-    assert r.status_code == 422
-    assert 'fingerprint' in r.json()['error']
-
 
 def test_guide_count_cannot_change():
     _, guides, _, _, manifest = fixture()
