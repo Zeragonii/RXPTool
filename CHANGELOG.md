@@ -4,13 +4,18 @@
 
 - Consolidate the WebUI into **Decrypt → editable_guides.txt → Encrypt → rebuilt_import.txt**.
 - Remove the Combined plaintext, Separate guides, Layout JSON, metadata bundle and legacy recovery controls, JavaScript logic, API endpoints and obsolete Python modules.
-- Remove legacy combined/ZIP encryption, full-manifest rebuilding and AES `.rxptool` recovery. **Fix a pre-existing fingerprint validation bug**: the editable parser previously read but never compared the fingerprint. Retain strict raw-chunk verification.
+- Remove legacy combined/ZIP encryption, full-manifest rebuilding and AES `.rxptool` recovery. Retain strict raw-chunk verification.
 - Make the top headline configurable with `RXP_HEADLINE` (defaults to **Guides, unlocked into plaintext.**), safely escaped on both pages and propagated through all stack examples.
 - Harmonise navigation, branding, result presentation, asset URLs, static styles and footer versions. Set `VERSION=2.0.0` for GHCR release tagging.
 - Update the optional CLI to export the same editable document rather than separate per-guide files.
 - Drop the unused `cryptography` dependency, refresh tests and rewrite deployment/documentation for the focused workflow.
 
 ---
+
+## v2.0.0 correction — no account-fingerprint enforcement
+
+- Restore the original uploaded project behaviour: read legacy account fingerprint metadata, but do not compare it to the ID used for output encryption.
+- Update Encrypt page messaging and tests. No other authentication, decryption, format or integrity checks are changed.
 
 ## Historical releases (prior to v2.0.0)
 

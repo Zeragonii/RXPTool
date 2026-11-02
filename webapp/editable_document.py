@@ -123,7 +123,7 @@ def make_editable_document(payload: str, account_id: str, max_plaintext_bytes: i
 
 
 def rebuild_from_editable_document(document: bytes, account_id: str) -> tuple[str, int, int, list[bytes]]:
-    """Parse a user-edited TXT and freshly encrypt raw chunks for the SAME ID.
+    """Parse a user-edited TXT and freshly encrypt raw chunks for the supplied ID.
 
     Returns (framed import, guide count, chunk count, original guide contents).
     The header guide count is recalculated. Each #!empty marks an empty NUL
@@ -146,11 +146,10 @@ def rebuild_from_editable_document(document: bytes, account_id: str) -> tuple[st
 
     header = read_setting(b'#!header=')
     footer = read_setting(b'#!footer=')
-    fingerprint = read_setting(b'#!account_key_fingerprint=')
-    if (not isinstance(fingerprint, str) or
-            not re.fullmatch(r'[0-9a-f]{64}', fingerprint) or
-            fingerprint != hashlib.sha256(derive_base(account_id)).hexdigest()):
-        raise DocumentError('ID does not match the original document account; same-account reconstruction only')
+    # Preserve the existing directive for backward compatibility, but do not
+    # validate or enforce its value. The ID supplied here is only used to
+    # generate the requested output encryption key.
+    read_setting(b'#!account_key_fingerprint=')
     if not isinstance(header, str) or not re.fullmatch(r'\D*\d+\|', header) or not isinstance(footer, str) or not re.fullmatch(r'\|\d+\D*', footer):
         raise DocumentError('The stored import header/footer is not valid')
     between = []

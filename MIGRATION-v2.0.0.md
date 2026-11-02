@@ -22,7 +22,7 @@ Encrypt editable TXT --------> rebuilt_import.txt
 | Decrypt encrypted import | KEPT | `POST /api/decrypt` (editable only) |
 | Editable guide TXT | KEPT | `webapp/editable_document.py` |
 | Rebuild into native import | KEPT | `POST /api/encrypt` (editable only) |
-| Account key fingerprint | FIXED | Explicitly checked during rebuild |
+| Account key fingerprint | INFORMATIONAL | Read for document compatibility, not enforced |
 | Native integrity validation | KEPT | Adler-32, zlib, raw-chunk round trip |
 | Upload / paste and download | KEPT | Streamlined browser pages |
 | Basic auth / Docker / GHCR | KEPT | Same service approach |

@@ -59,7 +59,7 @@
   get('encryptForm').addEventListener('submit',async e=>{
     e.preventDefault(); if(submit.disabled)return;
     const account=id.value.trim();
-    if(!account){fail('Enter the original matching Battle.net ID.');id.focus();return;}
+    if(!account){fail('Enter the Battle.net ID for output encryption.');id.focus();return;}
     if(!selected){fail('Select editable_guides.txt first.');return;}
     const probe=(await selected.slice(0,32).text()).replace(/^\uFEFF/,'');
     if(!/^#!RXPTOOL\/1\r?\n/.test(probe)){fail('This is not a self-contained RXPTool Editable guide TXT.');return;}

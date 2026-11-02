@@ -6,7 +6,7 @@ Self-hosted, account-keyed RestedXP import editor. **One document format, two sc
 
 1. **Decrypt** (`/`): upload/paste the original, complete encrypted import and enter the matching account ID. Download **`editable_guides.txt`**.
 2. Edit your guide text, including steps, names or tags. Keep document directives such as `#!RXPTOOL/1`, `#!guide`, `#!endguide`, `#!empty`, `#!chunk` and `#!endchunk` intact unless intentionally changing guide boundaries.
-3. **Encrypt** (`/encrypt`): upload the edited `editable_guides.txt` and enter the **same account ID**. Download **`rebuilt_import.txt`**.
+3. **Encrypt** (`/encrypt`): upload the edited `editable_guides.txt` and enter the **ID to use for output encryption**. Download **`rebuilt_import.txt`**.
 4. RXPTool rebuilds native import framing, dynamically recalculates guide count, NUL slots and Adler-32 checksums, recompresses and freshly encrypts the chunks. It decrypts the rebuilt output again and checks the exact raw chunk bytes and guide count before returning it.
 
 **Game compatibility:** guides can still be skipped by the RestedXP addon for incompatible game versions, factions or seasonal tags. The v1.1.x Retail test established that the native import pipeline can load correctly when guide metadata is compatible. RXPTool does not rewrite quests/zones for other game versions.
@@ -15,7 +15,7 @@ Self-hosted, account-keyed RestedXP import editor. **One document format, two sc
 
 There is **no UI or API support** for Combined plaintext, Separate guides ZIP, Layout JSON, lossless metadata ZIP, manual manifest rebuild, standalone TXT/ZIP chunk encryption or AES `.rxptool` recovery. Their server routes, modules and UI logic were removed. Keep a v1.x checkout if you must access those historic formats.
 
-**Security fix in v2.0.0:** the editable document parser now actually verifies the account-key fingerprint. The uploaded version read the fingerprint without comparing it to the supplied ID. The fingerprint is retained and enforced, but is still only a local editable-file consistency check. It prevents accidental use of a different derived account key, **not** online Battle.net authentication. No server-side guide or account history is kept.
+**Account key handling:** the editable document retains its legacy `#!account_key_fingerprint` metadata for compatibility, but the Encrypt backend does **not** compare it with the supplied ID, matching the originally uploaded project's behaviour. The submitted ID determines output encryption; this is not Battle.net authentication. No server-side guide or account history is kept.
 
 ## Configuration
 

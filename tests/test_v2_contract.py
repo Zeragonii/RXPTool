@@ -119,11 +119,16 @@ def test_edit_reencrypt_and_recount():
     assert second.headers['x-guide-count'] == '1'
 
 
-def test_wrong_account_rejected():
+def test_account_key_fingerprint_is_not_enforced_as_in_uploaded_project():
     doc = decrypted()
     response = encrypt_doc(doc, account='Wrong#2026')
-    assert response.status_code == 422
-    assert 'same-account' in response.text or 'original document account' in response.text
+    assert response.status_code == 200, response.text
+    assert response.headers['x-package-verified'] == 'true'
+    second = client.post('/api/decrypt', json={'battle_id': 'Wrong#2026', 'payload': response.text})
+    assert second.status_code == 200, second.text
+    assert b'#name Welcome' in second.content
+    # Retain the original metadata without enforcing it on the output key.
+    assert b'#!account_key_fingerprint=' in doc
 
 
 def test_invalid_malformed_and_oversized_requests():

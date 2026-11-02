@@ -32,9 +32,9 @@
         <div class="eyebrow"><span class="eyebrow-line"></span> EDIT. REBUILD. VERIFY.</div>
         <h1 id="title"><span>{{RXP_HEADLINE}}</span></h1>
         <p>Re-encrypt your edited guide document into a full import string. All guide boundaries and checksums are rebuilt automatically.</p>
-        <div class="hero-points"><span><i aria-hidden="true">✓</i> Matching account-derived cipher</span><span><i aria-hidden="true">✓</i> Direct Decrypt compatibility</span><span><i aria-hidden="true">✓</i> No server-side history</span></div>
+        <div class="hero-points"><span><i aria-hidden="true">✓</i> Account-derived cipher</span><span><i aria-hidden="true">✓</i> Direct Decrypt compatibility</span><span><i aria-hidden="true">✓</i> No server-side history</span></div>
       </section>
-      <div class="notice-bar" role="note"><strong>One format. Two steps.</strong><span>Decrypt an import to <code>editable_guides.txt</code>, edit it, then upload the same file here using the original account ID. All boundaries travel with the file — no extra downloads.</span></div>
+      <div class="notice-bar" role="note"><strong>One format. Two steps.</strong><span>Decrypt an import to <code>editable_guides.txt</code>, edit it, then upload the same file here using the ID for the output import. All boundaries travel with the file — no extra downloads.</span></div>
       <div class="main-grid">
         <section class="panel form-panel" aria-labelledby="form-title">
           <div class="panel-top"><div><span class="overline">ENCRYPT WORKSPACE</span><h2 id="form-title">Rebuild an import</h2></div><span class="step-counter">01 / 02</span></div>
@@ -45,7 +45,7 @@
               <input id="encryptId" name="encryptId" type="text" placeholder="YourName#1234" maxlength="256" autocomplete="off" spellcheck="false" aria-describedby="encryptIdHint" />
               <button id="toggleEncryptId" class="icon-button" type="button" title="Show or hide ID" aria-label="Hide account ID"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2.5 12S6 6.5 12 6.5s9.5 5.5 9.5 5.5-3.5 5.5-9.5 5.5S2.5 12 2.5 12Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg></button>
             </div>
-            <p id="encryptIdHint" class="field-hint">Use the same ID on the Decrypt page to recover the plaintext. Case is ignored.</p>
+            <p id="encryptIdHint" class="field-hint">This ID determines the key used to encrypt the output import. Case is ignored.</p>
             <label class="remember"><input id="rememberEncryptId" type="checkbox" /><span class="checkmark" aria-hidden="true"></span><span>Remember this ID on this device <small>Stored only in this browser, not on the server</small></span></label>
             <div class="soft-rule"></div>
             <div class="field-label"><span class="field-number">02</span><span>Editable guide TXT</span><span class="required">REQUIRED</span></div>
@@ -60,7 +60,7 @@
             <div class="soft-rule"></div>
             <div id="encryptError" class="error-box" role="alert" hidden></div>
             <button id="encryptSubmit" type="submit" class="primary-btn"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span id="encryptSubmitLabel">Encrypt guides</span><svg class="button-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12 14 0m0 0-6-6m6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-            <p class="submit-note">Only RXPTool editable TXT files are accepted. Import framing, separator positions and checksums are recalculated. The original matching ID is required.</p>
+            <p class="submit-note">Only RXPTool editable TXT files are accepted. Import framing, separator positions and checksums are recalculated. An ID is required to derive the output encryption key.</p>
           </form>
         </section>
         <aside class="sidebar" aria-label="Output and information">
