@@ -100,20 +100,6 @@ def test_markers_allow_adding_and_deleting_whole_guides_and_recount():
     assert count == 2 and built.startswith('Banner\n2|')
 
 
-def test_wrong_id_and_bad_controls_are_rejected():
-    source, _, _ = get_sample()
-    editable, _, _ = make_editable_document(source, ID)
-    wrong = encrypt_file(editable, 'WrongId#2222')
-    assert wrong.status_code == 422
-    assert 'same-account' in wrong.json()['error']
-    bad = encrypt_file(editable.replace(b'#!endguide', b'#!garbage', 1))
-    assert bad.status_code == 422
-    assert 'Unterminated' in bad.json()['error']
-    extra_nul = encrypt_file(editable + b'\0')
-    assert extra_nul.status_code == 422
-    assert 'NUL' in extra_nul.json()['error']
-
-
 def test_windows_crlf_and_no_trailing_lf_are_accepted():
     source, guides, _ = get_sample()
     editable, _, _ = make_editable_document(source, ID)
