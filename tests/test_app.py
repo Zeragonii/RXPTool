@@ -190,121 +190,148 @@ def test_versioned_asset_urls_and_strict_csp():
 
     page = client.get('/')
     assert page.status_code == 200
-    assert 'src="/assets/app-v1.1.0.js"' in page.text
-    assert 'href="/assets/app-v1.1.0.css"' in page.text
-    assert 'v1.1.0' in page.text
+    assert 'src="/assets/app-v1.1.1.js"' in page.text
+    assert 'href="/assets/app-v1.1.1.css"' in page.text
+    assert 'v1.1.1' in page.text
     assert not re.search(r'<script(?![^>]*\bsrc=)', page.text, flags=re.I)
     assert "script-src 'self'" in page.headers['content-security-policy']
     assert "'unsafe-inline'" not in page.headers['content-security-policy']
-    for asset, media in [('app-v1.1.0.js', 'application/javascript'), ('app-v1.1.0.css', 'text/css')]:
+    for asset, media in [('app-v1.1.1.js', 'application/javascript'), ('app-v1.1.1.css', 'text/css')]:
         response = client.get('/assets/' + asset)
         assert response.status_code == 200
         assert response.headers['content-type'].startswith(media)
         assert response.headers['cache-control'] == 'no-store'
-        assert response.content == client.get('/assets/' + asset.replace('-v1.1.0', '')).content
-    assert 'downloadCombined' in client.get('/assets/app-v1.1.0.js').text
-    assert "missingIds" in client.get('/assets/app-v1.1.0.js').text
+        assert response.content == client.get('/assets/' + asset.replace('-v1.1.1', '')).content
+    assert 'downloadCombined' in client.get('/assets/app-v1.1.1.js').text
+    assert "missingIds" in client.get('/assets/app-v1.1.1.js').text
     assert client.get('/assets/app-v1.0.3.js').status_code == 404
 
 
 def test_encrypt_page_has_separate_route_and_navigation():
     homepage = client.get('/')
     assert 'href="/encrypt"' in homepage.text
-    encrypt_page = client.get('/encrypt')
-    assert encrypt_page.status_code == 200
-    assert 'id="encryptForm"' in encrypt_page.text
-    assert 'id="recoveryForm"' in encrypt_page.text
-    assert '.rxptool' in encrypt_page.text
-    assert 'not</strong> RestedXP import strings' in encrypt_page.text
-    assert 'src="/assets/encrypt-v1.1.0.js"' in encrypt_page.text
-    assert '<script>' not in encrypt_page.text
-    assert client.get('/assets/encrypt-v1.1.0.js').status_code == 200
-    assert 'encryptForm' in client.get('/assets/encrypt-v1.1.0.js').text
+    page = client.get('/encrypt')
+    assert page.status_code == 200
+    assert 'id="encryptForm"' in page.text
+    assert 'id="recoveryForm"' in page.text  # old .rxptool recovery is retained
+    assert 'Compatible with the Decrypt page' in page.text
+    assert 'src="/assets/encrypt-v1.1.1.js"' in page.text
+    assert '<script>' not in page.text
+    assert client.get('/assets/encrypt-v1.1.1.js').status_code == 200
+    assert 'encryptGuideCount' in client.get('/assets/encrypt-v1.1.1.js').text
 
 
-def test_new_format_roundtrip_preserves_combined_guides_and_filename():
-    """Encrypted RXPTool format is intentionally NOT a native RXP import string."""
-    original = (b'#group Alpha\n#name First\nstep\n+Hi\n\0'
-                b'#group Alpha\n#name Second\nstep\n+Bye\n\0\0')
-    encoded = base64.b64encode(original).decode('ascii')
-    encrypt_response = client.post('/api/encrypt', json={
-        'battle_id': 'Example#1234', 'filename': 'my guides.txt', 'content_base64': encoded
+def _encrypt_via_api(data: bytes, filename: str = 'guides.txt', account_id: str = 'Example#1234'):
+    return client.post('/api/encrypt', json={
+        'battle_id': account_id, 'filename': filename,
+        'content_base64': base64.b64encode(data).decode('ascii')
     })
-    assert encrypt_response.status_code == 200, encrypt_response.text
-    assert encrypt_response.content.startswith(b'RXPTENC\x01')
-    assert encrypt_response.content != original
-    assert encrypt_response.headers['x-package-verified'] == 'true'
-    assert 'encrypted_guide.rxptool' in encrypt_response.headers['content-disposition']
-    assert b'#group Alpha' not in encrypt_response.content
-    reopen = client.post('/api/open-package', json={
-        'battle_id': 'Example#1234', 'filename': 'encrypted_guide.rxptool',
-        'content_base64': base64.b64encode(encrypt_response.content).decode('ascii')
+
+
+def test_encrypt_is_reverse_of_main_decrypt_for_combined_txt():
+    guides = [
+        b'#group Alpha\n#name First\nstep\n+Hi\n',
+        b'#group Alpha\n#name Second\nstep\n+Bye\n',
+    ]
+    original = b'\0'.join(guides)
+    r = _encrypt_via_api(original)
+    assert r.status_code == 200, r.text
+    assert r.headers['x-package-verified'] == 'true'
+    assert r.headers['x-guide-count'] == '2'
+    assert 'encrypted_guides.txt' in r.headers['content-disposition']
+    payload = r.content.decode('ascii')
+    assert payload.count(':') == 1 and payload.endswith('%')
+    assert not payload.startswith('RXPTENC')
+    decrypted = client.post('/api/decrypt', json={
+        'battle_id': 'example#1234', 'payload': payload, 'format': 'combined'
     })
-    assert reopen.status_code == 200, reopen.text
-    assert reopen.content == original
-    assert 'my guides.txt' in reopen.headers['content-disposition']
+    assert decrypted.status_code == 200, decrypted.text
+    assert decrypted.content == original
+    split = client.post('/api/decrypt', json={
+        'battle_id': 'Example#1234', 'payload': payload, 'format': 'split'
+    })
+    assert split.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(split.content)) as result:
+        assert [result.read(x) for x in result.namelist()] == guides
 
 
-def test_new_format_zip_roundtrip_without_modifying_zip():
+def test_encrypt_reverses_main_decrypt_for_split_zip():
+    originals = [b'#group Test\n#name A\nstep\n+First\n', b'#group Test\n#name B\nstep\n+Second\n']
     buf = io.BytesIO()
-    with zipfile.ZipFile(buf, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr('first.txt', b'hello')
-        archive.writestr('second.txt', b'\0quoted')
-    original = buf.getvalue()
-    enc = client.post('/api/encrypt', json={
-        'battle_id': 'Person#987', 'filename': 'separate-guides.zip',
-        'content_base64': base64.b64encode(original).decode()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as archive:
+        for i, data in enumerate(originals, 1):
+            archive.writestr(f'guide_{i:03}.txt', data)
+    result = _encrypt_via_api(buf.getvalue(), 'split-guides.zip')
+    assert result.status_code == 200, result.text
+    assert result.headers['x-guide-count'] == '2'
+    dec = client.post('/api/decrypt', json={
+        'battle_id': 'Example#1234', 'payload': result.content.decode(), 'format': 'combined'
     })
-    assert enc.status_code == 200, enc.text
-    dec = client.post('/api/open-package', json={
-        'battle_id': 'person#987', 'filename': 'encrypted_guide.rxptool',
-        'content_base64': base64.b64encode(enc.content).decode()
-    })
-    assert dec.status_code == 200, dec.text
-    assert dec.content == original
-    assert 'separate-guides.zip' in dec.headers['content-disposition']
+    assert dec.status_code == 200
+    assert dec.content == b'\0'.join(originals)
 
 
-def test_encryption_randomized_wrong_id_and_tamper_fail():
-    request = {
-        'battle_id': 'Owner#31415', 'filename': 'new.txt',
-        'content_base64': base64.b64encode(b'Not a commercial guide\0hello').decode()
-    }
-    first = client.post('/api/encrypt', json=request)
-    second = client.post('/api/encrypt', json=request)
-    assert first.status_code == second.status_code == 200
-    assert first.content != second.content  # unique salt and nonce
-    bad_id = client.post('/api/open-package', json={
-        'battle_id': 'Other#31415', 'filename': 'a.rxptool',
-        'content_base64': base64.b64encode(first.content).decode()
+def test_native_encoder_rejects_wrong_id_and_tampering():
+    enc = _encrypt_via_api(b'#group Demo\n#name One\nstep\n+Hi\n')
+    assert enc.status_code == 200
+    wrong = client.post('/api/decrypt', json={
+        'battle_id': 'Wrong#1234', 'payload': enc.text, 'format': 'combined'
     })
-    assert bad_id.status_code == 422
-    assert 'authentication failed' in bad_id.json()['error']
-    tampered = bytearray(first.content)
-    tampered[-1] ^= 0x1
-    bad_tag = client.post('/api/open-package', json={
-        'battle_id': request['battle_id'], 'filename': 'a.rxptool',
-        'content_base64': base64.b64encode(tampered).decode()
+    assert wrong.status_code == 422
+    damaged = enc.text.replace(':', ':AAAA', 1)
+    fail = client.post('/api/decrypt', json={
+        'battle_id': 'Example#1234', 'payload': damaged
     })
-    assert bad_tag.status_code == 422
-    assert 'authentication failed' in bad_tag.json()['error']
+    assert fail.status_code == 422
 
 
-def test_package_api_rejects_invalid_inputs_and_native_format():
-    good = base64.b64encode(b'abc').decode()
-    assert client.post('/api/encrypt', json={'battle_id':'', 'content_base64':good}).status_code == 400
+def test_encrypt_normalises_nul_boundaries_and_preserves_guides():
+    data = b'\0\0#group A\n#name B\nstep\n+one\n\0\0#group A\n#name C\nstep\n+two\n\0'
+    enc = _encrypt_via_api(data)
+    assert enc.status_code == 200
+    dec = client.post('/api/decrypt', json={'battle_id': 'Example#1234', 'payload': enc.text, 'format': 'combined'})
+    assert dec.content == b'#group A\n#name B\nstep\n+one\n\0#group A\n#name C\nstep\n+two\n'
+
+
+def test_encrypt_rejects_invalid_input_zip_bombs_and_oversized_content():
+    assert client.post('/api/encrypt', json={'battle_id':'', 'content_base64':base64.b64encode(b'abc').decode()}).status_code == 400
     assert client.post('/api/encrypt', json={'battle_id':'abc', 'content_base64':'!!'}).status_code == 400
-    assert client.post('/api/encrypt', json={'battle_id':'abc', 'content_base64':''}).status_code == 400
     assert client.post('/api/encrypt', content='data', headers={'content-type':'text/plain'}).status_code == 415
-    assert client.post('/api/open-package', json={
-        'battle_id': 'abc', 'content_base64': base64.b64encode(b'not an RXPTool encrypted package').decode()
-    }).status_code == 422
-    assert client.post('/api/encrypt', json={
-        'battle_id':'abc', 'filename':'../../bad.txt', 'content_base64':good
-    }).status_code == 200  # filename sanitized, never used for filesystem IO
+    assert _encrypt_via_api(b'bad zip data', 'some.zip').status_code == 422
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr('guide_001.txt', b'X' * (16 * 1024 * 1024 + 1))
+    assert _encrypt_via_api(buf.getvalue(), 'bomb.zip').status_code == 422
+    assert _encrypt_via_api(b'\0\0').status_code == 422
 
 
-def test_package_crypto_unit_rejects_truncated_bomb_and_wrong_format():
+def test_legacy_package_recovery_remains_available():
+    from webapp.package_crypto import encrypt_package
+    original = b'legacy old-style encrypted content'
+    package = encrypt_package(original, 'Example#1234', 'old.txt')
+    dec = client.post('/api/open-package', json={
+        'battle_id': 'Example#1234', 'filename': 'guide.rxptool',
+        'content_base64': base64.b64encode(package).decode()
+    })
+    assert dec.status_code == 200
+    assert dec.content == original
+    assert 'old.txt' in dec.headers['content-disposition']
+
+
+def test_native_cipher_inverse_with_randomized_synthetic_data():
+    from webapp.native_encrypt import encrypt_payload
+    from rxp_decrypt import extract_chunks, decode_chunk
+    import os
+    for size in (1, 127, 4097, 65536):
+        # Byte samples are structurally opaque, while the Decrypt page exposes nonempty NUL chunks.
+        plaintext = os.urandom(size).replace(b'\x00', b'A')
+        encoded = encrypt_payload(plaintext, 'Demo#789')
+        chunk = extract_chunks(encoded, None)[0]
+        decoded = decode_chunk(chunk, initial_permutation(derive_base('Demo#789')), 17 * 1024 * 1024)
+        assert decoded == plaintext
+
+
+def test_package_crypto_legacy_unit_rejects_truncated_and_wrong_format():
     from webapp.package_crypto import encrypt_package, decrypt_package, PackageError
     import pytest
     content = b'a' * 500000

@@ -1,3 +1,14 @@
+# Changelog
+
+## v1.1.1 — 2026-11-02
+
+- **Fix Encrypt/Decrypt interoperability:** Encrypt now generates the same account-derived XOR/zlib/Adler-32 Base64 chunk format the main Decrypt page accepts, instead of producing incompatible `.rxptool` AES packages.
+- Allow NUL-separated plaintext TXT files or ZIP archives of individual TXT guides, preserving the guide bytes and normalising guide separators.
+- Verify each new output via the **actual main decoder** before enabling download.
+- Keep the old `.rxptool` decryption as optional **Legacy recovery** for existing v1.1.0 packages.
+- Update frontend wording, counts and versioned asset URLs without relaxing CSP or changing Docker configuration.
+- Add encrypt → main decrypt and split ZIP integration tests; validate all 191 entries from the user's sample locally.
+
 ## v1.1.0 — Independent encrypted-package workspace
 
 - Add a separate **Encrypt** page at `/encrypt`, with a matching header navigation tab.
@@ -9,7 +20,6 @@
 - Warn explicitly that `.rxptool` is **not RestedXP import compatible** and a public Battle.net ID alone is not a strong confidentiality secret.
 - Increment frontend cache-busting URLs to v1.1.0, add comprehensive API/browser tests, and install `cryptography` in the Docker image.
 
-# Changelog
 
 ## v1.0.3 — 2026-11-02
 

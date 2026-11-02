@@ -4,7 +4,7 @@
   const ids = ['encryptForm', 'encryptId', 'rememberEncryptId', 'encryptFile',
     'encryptDrop', 'encryptFileTitle', 'encryptFileDescription', 'clearEncryptFile',
     'encryptError', 'encryptSubmit', 'encryptSubmitLabel', 'encryptEmpty',
-    'encryptLoading', 'encryptResult', 'encryptInputSize', 'encryptOutputSize',
+    'encryptLoading', 'encryptResult', 'encryptInputSize', 'encryptOutputSize', 'encryptGuideCount',
     'downloadEncrypted', 'recoveryForm', 'recoverFile', 'recoverError',
     'recoverSubmit', 'recoverStatus', 'toggleEncryptId'];
   const missing = ids.filter((name) => !byId(name));
@@ -112,7 +112,7 @@
     }
     const disposition = response.headers.get('Content-Disposition') || '';
     const match = disposition.match(/filename="([^"]+)"/);
-    return { blob: await response.blob(), filename: safeFile(match?.[1] || 'package.bin') };
+    return { blob: await response.blob(), filename: safeFile(match?.[1] || 'encrypted_guides.txt'), guideCount: response.headers.get('X-Guide-Count') };
   }
 
   function downloadFile(result) {
@@ -127,7 +127,7 @@
     event.preventDefault();
     if (byId('encryptSubmit').disabled) return;
     const id = input.value.trim();
-    if (!id) { displayError(error, 'Enter the ID to bind the package to.'); input.focus(); return; }
+    if (!id) { displayError(error, 'Enter the ID to encrypt the guides with.'); input.focus(); return; }
     if (!file) { displayError(error, 'Choose a plaintext guide file first.'); return; }
     persistId(); clearError(error); reset();
     show('encryptEmpty', false); show('encryptLoading', true);
@@ -140,12 +140,13 @@
       download = result;
       byId('encryptInputSize').textContent = sizeLabel(file.size);
       byId('encryptOutputSize').textContent = sizeLabel(result.blob.size);
+      byId('encryptGuideCount').textContent = result.guideCount || '—';
       show('encryptLoading', false); show('encryptResult', true);
     } catch (exc) {
       if (epoch === operationId) { reset(); displayError(error, exc?.message || 'Could not encrypt this file.'); }
     } finally {
       byId('encryptSubmit').disabled = false;
-      byId('encryptSubmitLabel').textContent = 'Encrypt package';
+      byId('encryptSubmitLabel').textContent = 'Encrypt guides';
     }
   });
   byId('downloadEncrypted').addEventListener('click', () => { if (download) downloadFile(download); });

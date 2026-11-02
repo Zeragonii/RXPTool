@@ -10,8 +10,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/assets/app-v1.1.0.css" />
-  <script src="/assets/encrypt-v1.1.0.js" defer></script>
+  <link rel="stylesheet" href="/assets/app-v1.1.1.css" />
+  <script src="/assets/encrypt-v1.1.1.js" defer></script>
 </head>
 <body>
   <div class="ambient ambient-a" aria-hidden="true"></div>
@@ -29,12 +29,12 @@
     </header>
     <main>
       <section class="hero" aria-labelledby="title">
-        <div class="eyebrow"><span class="eyebrow-line"></span> YOUR FILES. YOUR FORMAT.</div>
-        <h1 id="title">Guides, <span>packaged<br class="hero-break" /> your way.</span></h1>
-        <p>Create an encrypted RXPTool package from your own plaintext guide files. Download the package, then reopen it using the same ID whenever you need the exact original file.</p>
-        <div class="hero-points"><span><i aria-hidden="true">✓</i> Authenticated AES-GCM</span><span><i aria-hidden="true">✓</i> Exact-byte recovery</span><span><i aria-hidden="true">✓</i> No server-side history</span></div>
+        <div class="eyebrow"><span class="eyebrow-line"></span> REVERSE THE DECRYPTION PIPELINE.</div>
+        <h1 id="title">Guides, <span>encrypted<br class="hero-break" /> and reversible.</span></h1>
+        <p>Upload plaintext guides, enter the ID, and generate an encoded payload that you can upload directly to the main Decrypt page with that same ID.</p>
+        <div class="hero-points"><span><i aria-hidden="true">✓</i> Matching account-derived cipher</span><span><i aria-hidden="true">✓</i> Direct Decrypt compatibility</span><span><i aria-hidden="true">✓</i> No server-side history</span></div>
       </section>
-      <div class="notice-bar" role="note"><strong>RXPTool format</strong><span>Exports use our independent <code>.rxptool</code> format. They are <strong>not</strong> RestedXP import strings and cannot be loaded by the addon. Battle.net IDs are public identifiers, not strong secret passwords.</span></div>
+      <div class="notice-bar" role="note"><strong>Decrypt-page compatible</strong><span>Exports use the same zlib, Adler-32 and account-derived XOR encoding as the Decrypt page, not the older .rxptool AES format. This verifies compatibility with RXPTool; compatibility with the add-on's complete import header and entitlement checks has not been established.</span></div>
       <div class="main-grid">
         <section class="panel form-panel" aria-labelledby="form-title">
           <div class="panel-top"><div><span class="overline">ENCRYPT WORKSPACE</span><h2 id="form-title">Create a package</h2></div><span class="step-counter">01 / 02</span></div>
@@ -45,7 +45,7 @@
               <input id="encryptId" name="encryptId" type="text" placeholder="YourName#1234" maxlength="256" autocomplete="off" spellcheck="false" aria-describedby="encryptIdHint" />
               <button id="toggleEncryptId" class="icon-button" type="button" title="Show or hide ID" aria-label="Hide account ID"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2.5 12S6 6.5 12 6.5s9.5 5.5 9.5 5.5-3.5 5.5-9.5 5.5S2.5 12 2.5 12Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg></button>
             </div>
-            <p id="encryptIdHint" class="field-hint">The exact same ID is required when reopening the package. Case is ignored.</p>
+            <p id="encryptIdHint" class="field-hint">Use the same ID on the Decrypt page to recover the plaintext. Case is ignored.</p>
             <label class="remember"><input id="rememberEncryptId" type="checkbox" /><span class="checkmark" aria-hidden="true"></span><span>Remember this ID on this device <small>Stored only in this browser, not on the server</small></span></label>
             <div class="soft-rule"></div>
             <div class="field-label"><span class="field-number">02</span><span>Plaintext guide file</span><span class="required">REQUIRED</span></div>
@@ -58,20 +58,20 @@
             </div>
             <button id="clearEncryptFile" class="clear-file" type="button" hidden>Remove selected file</button>
             <div id="encryptError" class="error-box" role="alert" hidden></div>
-            <button id="encryptSubmit" type="submit" class="primary-btn"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span id="encryptSubmitLabel">Encrypt package</span><svg class="button-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12 14 0m0 0-6-6m6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-            <p class="submit-note">The server verifies each encrypted package can be decrypted to the exact uploaded bytes.</p>
+            <button id="encryptSubmit" type="submit" class="primary-btn"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span id="encryptSubmitLabel">Encrypt guides</span><svg class="button-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12 14 0m0 0-6-6m6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <p class="submit-note">The server checks the output with the main decryptor before returning it. Guide separators are normalised to single NUL bytes.</p>
           </form>
         </section>
         <aside class="sidebar" aria-label="Output and recovery">
           <section class="panel output-panel" aria-labelledby="outputTitle">
-            <div class="panel-top"><div><span class="overline">OUTPUT</span><h2 id="outputTitle">Encrypted package</h2></div><span class="step-counter">02 / 02</span></div>
-            <div id="encryptEmpty" class="empty-state"><div class="empty-illustration" aria-hidden="true"><svg viewBox="0 0 92 92" fill="none"><rect x="18" y="15" width="56" height="65" rx="11" stroke="currentColor" stroke-width="2"/><path d="M32 38h28m-28 10h25" stroke="currentColor" stroke-width="2"/><rect x="54" y="54" width="28" height="25" rx="6" fill="#101d30" stroke="#5EEAD4" stroke-width="2.5"/><path d="M61 54v-7a7 7 0 0 1 14 0v7" stroke="#5EEAD4" stroke-width="2.5"/></svg></div><strong>Ready to encrypt</strong><p>Your new package will appear here when processing finishes.</p></div>
-            <div id="encryptLoading" class="loading-state" hidden><div class="spinner"></div><strong>Encrypting package…</strong><p>Compressing, encrypting and verifying the file.</p></div>
-            <div id="encryptResult" hidden><div class="success-heading"><div class="success-icon">✓</div><div><strong>Package verified</strong><span>AES-GCM integrity check passed</span></div></div><div class="stats"><div><span>INPUT</span><strong id="encryptInputSize">—</strong></div><div><span>PACKAGE</span><strong id="encryptOutputSize">—</strong></div><div><span>FORMAT</span><strong>.rxptool</strong></div></div><p class="field-hint">This package will reopen to its original filename and exact byte contents when the same ID is supplied.</p><button id="downloadEncrypted" type="button" class="download-btn"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 17v3h16v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg> Download encrypted package</button></div>
+            <div class="panel-top"><div><span class="overline">OUTPUT</span><h2 id="outputTitle">Encoded guide payload</h2></div><span class="step-counter">02 / 02</span></div>
+            <div id="encryptEmpty" class="empty-state"><div class="empty-illustration" aria-hidden="true"><svg viewBox="0 0 92 92" fill="none"><rect x="18" y="15" width="56" height="65" rx="11" stroke="currentColor" stroke-width="2"/><path d="M32 38h28m-28 10h25" stroke="currentColor" stroke-width="2"/><rect x="54" y="54" width="28" height="25" rx="6" fill="#101d30" stroke="#5EEAD4" stroke-width="2.5"/><path d="M61 54v-7a7 7 0 0 1 14 0v7" stroke="#5EEAD4" stroke-width="2.5"/></svg></div><strong>Ready to encrypt</strong><p>Your encoded import chunk will appear here when processing finishes.</p></div>
+            <div id="encryptLoading" class="loading-state" hidden><div class="spinner"></div><strong>Encrypting guides…</strong><p>Compressing, encrypting and verifying with the main decoder.</p></div>
+            <div id="encryptResult" hidden><div class="success-heading"><div class="success-icon">✓</div><div><strong>Round-trip verified</strong><span>Compatible with the Decrypt page</span></div></div><div class="stats"><div><span>INPUT</span><strong id="encryptInputSize">—</strong></div><div><span>PAYLOAD</span><strong id="encryptOutputSize">—</strong></div><div><span>GUIDES</span><strong id="encryptGuideCount">—</strong></div></div><p class="field-hint">On the Decrypt page, upload this .txt payload and enter the same ID. Individual guides and their contents will be recovered; combined separators are canonicalised.</p><button id="downloadEncrypted" type="button" class="download-btn"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 17v3h16v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg> Download encrypted payload</button></div>
           </section>
           <section class="panel recovery-panel" aria-labelledby="recoveryTitle">
-            <div class="panel-top"><div><span class="overline">PACKAGE RECOVERY</span><h2 id="recoveryTitle">Open an RXPTool package</h2></div></div>
-            <p class="recover-lead">Have a previously encrypted <code>.rxptool</code> file? Select it below and use the ID above to recover the exact original file.</p>
+            <div class="panel-top"><div><span class="overline">LEGACY RECOVERY</span><h2 id="recoveryTitle">Open a v1.1.0 package</h2></div></div>
+            <p class="recover-lead">Have an older <code>.rxptool</code> AES file created by v1.1.0? Recover it here. New .txt exports are decrypted from the main Decrypt tab.</p>
             <form id="recoveryForm" novalidate>
               <label class="recovery-file-label" for="recoverFile">Encrypted file <span>(.rxptool)</span></label>
               <input id="recoverFile" type="file" accept=".rxptool" class="recovery-file-input" />
@@ -84,7 +84,7 @@
         </aside>
       </div>
     </main>
-    <footer><span>RXP Tool <span class="footer-sep">/</span> v1.1.0</span><span>Independent utility · Not affiliated with RestedXP</span></footer>
+    <footer><span>RXP Tool <span class="footer-sep">/</span> v1.1.1</span><span>Independent utility · Not affiliated with RestedXP</span></footer>
   </div>
 </body>
 </html>

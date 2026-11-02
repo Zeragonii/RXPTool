@@ -16,7 +16,8 @@ from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse, Response
 
-from webapp.package_crypto import PackageError, encrypt_package, decrypt_package
+from webapp.package_crypto import PackageError, decrypt_package
+from webapp.native_encrypt import EncryptError, encrypt_payload, prepare_guides
 from rxp_decrypt import (
     DecodeError,
     decode_chunk,
@@ -121,9 +122,9 @@ async def asset(asset: str):
         "app.js": "application/javascript",
         # Versioned asset URLs prevent old JS and new HTML from being mixed
         # by browser or reverse-proxy caches after a release.
-        "app-v1.1.0.css": "text/css",
-        "encrypt-v1.1.0.js": "application/javascript",
-        "app-v1.1.0.js": "application/javascript",
+        "app-v1.1.1.css": "text/css",
+        "encrypt-v1.1.1.js": "application/javascript",
+        "app-v1.1.1.js": "application/javascript",
         
         "favicon.svg": "image/svg+xml",
         "favicon-32.png": "image/png",
@@ -134,7 +135,7 @@ async def asset(asset: str):
         return failure(404, "Not found")
     # Both URLs serve the same canonical asset. Only the versioned URLs
     # are referenced by this release's HTML.
-    canonical = {"app-v1.1.0.css": "app.css", "app-v1.1.0.js": "app.js", "encrypt-v1.1.0.js": "encrypt.js"}.get(asset, asset)
+    canonical = {"app-v1.1.1.css": "app.css", "app-v1.1.1.js": "app.js", "encrypt-v1.1.1.js": "encrypt.js"}.get(asset, asset)
     return FileResponse(STATIC / canonical, media_type=media)
 
 
@@ -291,14 +292,18 @@ def _validate_package_input(body: Any) -> tuple[str, bytes, str]:
 def _package_operation(action: str, account_id: str, data: bytes, filename: str):
     try:
         if action == "encrypt":
-            result = encrypt_package(data, account_id, filename)
-            # Verify the AEAD round-trip before presenting the download.
-            original, _ = decrypt_package(result, account_id)
-            if original != data:
-                raise RuntimeError("Package round-trip verification failed")
-            return result, "encrypted_guide.rxptool", "application/octet-stream", {
-                "X-Package-Verified": "true", "X-Input-Bytes": str(len(data))
+            plain, guide_count = prepare_guides(data, filename)
+            result = encrypt_payload(plain, account_id)
+            # Verify using the exact decoder that powers the main Decrypt page.
+            recovered, chunks = decode_payload(account_id, result)
+            if chunks != 1 or b"\x00".join(recovered) != plain:
+                raise RuntimeError("Native payload round-trip verification failed")
+            return result.encode("ascii"), "encrypted_guides.txt", "text/plain; charset=utf-8", {
+                "X-Package-Verified": "true", "X-Input-Bytes": str(len(data)),
+                "X-Guide-Count": str(guide_count), "X-Chunk-Count": "1",
             }
+        # Backward compatibility: previously encrypted v1.1.0 .rxptool files
+        # can still be recovered, but are no longer produced by /api/encrypt.
         original, restored_name = decrypt_package(data, account_id)
         return original, restored_name, "application/octet-stream", {
             "X-Package-Verified": "true", "X-Input-Bytes": str(len(data))
@@ -320,7 +325,7 @@ async def _package_endpoint(request: Request, action: str):
         output, out_name, media, headers = await run_in_threadpool(
             _package_operation, action, account_id, data, filename
         )
-    except PackageError as exc:
+    except (PackageError, EncryptError, DecodeError) as exc:
         return failure(422, str(exc))
     except Exception:
         return failure(500, "Unexpected server error while handling package")
