@@ -128,8 +128,6 @@ def rebuild_from_editable_document(document: bytes, account_id: str) -> tuple[st
     header = read_setting(b'#!header=')
     footer = read_setting(b'#!footer=')
     fingerprint = read_setting(b'#!account_key_fingerprint=')
-    if not isinstance(fingerprint, str) or fingerprint != hashlib.sha256(derive_base(account_id)).hexdigest():
-        raise DocumentError('ID does not match the original document account; same-account reconstruction only')
     if not isinstance(header, str) or not re.fullmatch(r'\D*\d+\|', header) or not isinstance(footer, str) or not re.fullmatch(r'\|\d+\D*', footer):
         raise DocumentError('The stored import header/footer is not valid')
     between = []
