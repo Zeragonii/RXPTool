@@ -155,3 +155,30 @@ def test_export_selection_buttons_in_ui():
     assert 'id="downloadSplit"' in html
     assert 'Combined plaintext' in html
     assert 'Separate guides' in html
+
+
+def test_favicon_assets_reuse_header_icon():
+    from xml.etree import ElementTree as ET
+
+    homepage = client.get('/')
+    assert homepage.status_code == 200
+    assert b'href="/assets/favicon.svg"' in homepage.content
+    assert b'src="/assets/favicon.svg"' in homepage.content
+    for route, media in (
+        ('/favicon.ico', 'image/x-icon'),
+        ('/assets/favicon.svg', 'image/svg+xml'),
+        ('/assets/favicon-32.png', 'image/png'),
+        ('/assets/apple-touch-icon.png', 'image/png'),
+    ):
+        response = client.get(route)
+        assert response.status_code == 200
+        assert response.headers['content-type'].startswith(media)
+        assert response.content
+    root = ET.fromstring(client.get('/assets/favicon.svg').content)
+    assert root.tag.endswith('svg')
+    # Ensure that the original icon paths are reused, not approximated.
+    path_data = {node.attrib['d'] for node in root.iter() if node.tag.endswith('path')}
+    assert 'M20 3L35.5 11.5V28.5L20 37L4.5 28.5V11.5L20 3Z' in path_data
+    assert 'M13 14H26L18 22H27' in path_data
+    assert 'M12 27H24' in path_data
+    assert client.get('/assets/unknown.png').status_code == 404

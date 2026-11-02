@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.2 — 2026-11-02
+
+- Reused the original top-left RXP Decoder icon as the browser favicon (same SVG path data and colours).
+- The header now displays the same SVG asset used by the favicon, keeping both identical.
+- Added a multi-resolution `favicon.ico` fallback, 32px PNG favicon, and 180px Apple touch icon.
+- Whitelisted the static favicon endpoints without opening arbitrary file-serving routes.
+- Added API tests for all favicon assets and updated the release version.
+
 ## v1.0.1 — 2026-11-02
 
 - Added **two independent export buttons** to the WebUI: combined plaintext or separate files in a ZIP.

@@ -102,11 +102,23 @@ async def index():
     return FileResponse(STATIC / "index.html", media_type="text/html")
 
 
+@app.get("/favicon.ico")
+async def favicon():
+    return FileResponse(STATIC / "favicon.ico", media_type="image/x-icon")
+
+
 @app.get("/assets/{asset}")
 async def asset(asset: str):
-    if asset not in {"app.css", "app.js"}:
+    allowed_assets = {
+        "app.css": "text/css",
+        "app.js": "application/javascript",
+        "favicon.svg": "image/svg+xml",
+        "favicon-32.png": "image/png",
+        "apple-touch-icon.png": "image/png",
+    }
+    media = allowed_assets.get(asset)
+    if media is None:
         return failure(404, "Not found")
-    media = "text/css" if asset.endswith(".css") else "application/javascript"
     return FileResponse(STATIC / asset, media_type=media)
 
 

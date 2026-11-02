@@ -14,3 +14,6 @@
 .export-status.error{color:#ffb9b9}
 .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @media(max-width:400px){.export-actions{grid-template-columns:1fr}.export-actions .download-btn{min-height:60px;flex-direction:row;justify-content:flex-start;padding-left:16px}.export-actions .download-btn span{text-align:left}}
+
+/* v1.0.2: header and browser favicon share the same brand SVG. */
+.brand-icon{display:block;background:none;border:0;flex:none}

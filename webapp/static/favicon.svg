@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none">
+  <title>RXP Decoder</title>
+  <rect x="0.5" y="0.5" width="47" height="47" rx="14" fill="#172A3E" stroke="#385168"/>
+  <g transform="translate(9 9) scale(.75)">
+    <path d="M20 3L35.5 11.5V28.5L20 37L4.5 28.5V11.5L20 3Z" stroke="#8CDFFF" stroke-width="2.5"/>
+    <path d="M13 14H26L18 22H27" stroke="#8CDFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M12 27H24" stroke="#5EEAD4" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</svg>
