@@ -1,3 +1,14 @@
+## v1.1.0 — Independent encrypted-package workspace
+
+- Add a separate **Encrypt** page at `/encrypt`, with a matching header navigation tab.
+- Upload original/authorised plaintext TXT or ZIP, provide an ID, and download an authenticated `.rxptool` package.
+- Add **Open an RXPTool package** to recover the exact original file and filename using the same ID.
+- New API routes `/api/encrypt` and `/api/open-package` with clear authentication/tamper errors.
+- AES-256-GCM with fresh salt and nonce, PBKDF2-HMAC-SHA256 ID derivation, zlib compression and verified byte-exact round-trip.
+- Shared optional browser-side ID remembrance; strict CSP, no inline JavaScript, no server-side files or database.
+- Warn explicitly that `.rxptool` is **not RestedXP import compatible** and a public Battle.net ID alone is not a strong confidentiality secret.
+- Increment frontend cache-busting URLs to v1.1.0, add comprehensive API/browser tests, and install `cryptography` in the Docker image.
+
 # Changelog
 
 ## v1.0.3 — 2026-11-02

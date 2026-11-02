@@ -24,3 +24,19 @@
   padding: 1rem 1.25rem; border: 1px solid #fb7185; border-radius: 12px;
   background: #301924; color: #ffe4e6; font: 500 14px/1.6 system-ui, sans-serif;
 }
+
+/* v1.1.0: Navigation and separate package-encryption workspace. */
+.header-actions{display:flex;align-items:center;gap:17px}
+.site-nav{display:flex;align-items:center;gap:4px;background:#0d1829;border:1px solid #2b3c50;padding:5px;border-radius:11px}
+.nav-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:#90a6bd;font-size:12px;font-weight:740;letter-spacing:.15px;border-radius:7px;padding:8px 14px;transition:background .15s,color .15s}
+.nav-link:hover{color:#e8fcff;background:#1a3145}
+.nav-link.active{color:#07201e;background:#70e6ce}
+.nav-link:focus-visible{outline:2px solid #78e9d3;outline-offset:3px}
+.notice-bar{display:flex;gap:16px;align-items:flex-start;margin:-11px 0 24px;padding:14px 17px;border:1px solid #416478;background:linear-gradient(110deg,#153044,#102538);border-radius:12px;color:#a6c2d1;font-size:11px;line-height:1.65}
+.notice-bar strong{color:#a7f0e0;white-space:nowrap}.notice-bar span strong{color:#d0e7ee}
+.notice-bar code,.recover-lead code{color:#a5ebdd;font-family:ui-monospace,Consolas,monospace}
+.recovery-panel{padding:24px}.recovery-panel .panel-top{margin-bottom:9px}.recover-lead{color:#94aabb;font-size:12px;line-height:1.7;margin:0 0 20px}.recovery-file-label{display:block;font-size:12px;color:#dde8f0;font-weight:700;margin-bottom:9px}.recovery-file-label span{font-weight:500;color:#7691a6}
+.recovery-file-input{width:100%;display:block;color:#b7cadb;font-size:11px;line-height:1.6;background:#0b1525;border:1px solid #33445b;border-radius:9px;padding:9px}.recovery-file-input::file-selector-button{border:1px solid #426478;border-radius:6px;padding:6px 9px;margin-right:9px;background:#213a4d;color:#dff9f5;cursor:pointer}
+.recovery-panel .download-btn{margin-top:16px}.recovery-panel .error-box{margin-top:13px}.stats strong{overflow-wrap:anywhere}.notice-bar span{min-width:0}
+@media(max-width:780px){.topbar{gap:12px}.header-actions{gap:9px}.status{display:none}.site-nav{gap:3px}.nav-link{padding:7px 10px}.notice-bar{flex-direction:column;gap:3px;margin-top:0}}
+@media(max-width:430px){.brand-label{font-size:17px}.brand-icon{width:37px;height:37px}.nav-link{font-size:11px;padding:7px 9px}}

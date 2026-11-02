@@ -1,4 +1,4 @@
-# RXP Decoder WebUI
+# RXPTool — Self-hosted Decrypt + Package Utility
 
 A small, stateless, self-hosted browser UI for the included account-keyed guide payload decoder. Upload or paste an encrypted guide string, supply its matching identifier, and download decrypted plaintext. After decryption, choose either one NUL-delimited plaintext file or a ZIP containing individual guide text files. Both export formats are available without uploading the payload again. Optionally remember the identifier in your browser's `localStorage` (not on the server).
 
@@ -11,11 +11,48 @@ A small, stateless, self-hosted browser UI for the included account-keyed guide 
 - **v1.0.2:** Header icon doubles as the browser favicon, with SVG, ICO, PNG and Apple touch icon assets.
 - Optional browser-only ID remembrance; no accounts database or persistent payload storage.
 - Existing Python decoder (`rxp_decrypt.py`) used directly by the FastAPI backend.
+- Independent AES-GCM `.rxptool` encrypt-and-recover workspace, supporting exact-byte TXT and ZIP uploads.
 - **v1.0.1: Choose your export:** download a combined NUL-delimited `decrypted_guides.txt` or a ZIP of individually named `.txt` guide files. Download both if you like; the alternative format is generated on demand without re-uploading.
 - The API accepts an optional `format` parameter: `combined`, `split`, or `auto` (the backward-compatible default). `auto` keeps the v1.0.0 behaviour: single guide → `.txt`, multiple guides → ZIP.
 - Input validation, integrity checks, request caps, concurrent-operation limit, and error feedback.
 - Optional HTTP Basic authentication (`RXP_USERNAME` and `RXP_PASSWORD` must be supplied together).
 - Health endpoint `/health`, nonroot Docker user, read-only filesystem and minimal container privileges.
+
+## v1.1.0 — Separate encryption workspace
+
+The **Encrypt** tab is available at `/encrypt` alongside the existing `/` decrypt page.
+This is an independent RXPTool package format, **not** RestedXP's account-bound
+import-string format. **`.rxptool` files cannot be imported into RestedXP.**
+Use it for original or otherwise authorised guide material.
+
+1. Open **Encrypt** in the header, enter an ID and optionally check **Remember this ID**.
+2. Drag in a plaintext `.txt`, combined NUL-delimited guide file or a ZIP of separate guides.
+   The file is treated as **opaque bytes**: no parsing, splitting or rewriting occurs.
+3. Click **Encrypt package**, then **Download encrypted package** to receive
+   `encrypted_guide.rxptool`.
+4. To verify or recover the original later, upload `.rxptool` to **Open an RXPTool package**
+   on the same page and provide the exact original ID. Its original filename and bytes
+   are recovered; wrong IDs or damaged files are rejected.
+
+**Key security note:** the ID is used as key material, not as a secret password.
+Battle.net IDs can be public or guessable, so this is *not* a secure way to protect
+confidential guide files against someone who knows the ID. The format uses
+AES-256-GCM, random salt/nonce and PBKDF2-HMAC-SHA256 to detect tampering,
+but anyone who knows/guesses the ID can decrypt the package. It does not provide
+RestedXP license enforcement. Use HTTPS and a protected reverse proxy.
+
+The backend stores neither encrypted packages nor IDs on disk. Browser-only ID
+saving is optional and shared between the two workspace pages for convenience.
+A full package round-trip check is performed on the backend before offering a
+successful download. Max upload file size: 16 MiB (encoded requests up to 24 MiB).
+
+New API endpoints:
+
+- `POST /api/encrypt` with JSON `{"battle_id":"Example#1234","filename":"guide.txt","content_base64":"..."}` → `.rxptool` bytes
+- `POST /api/open-package` with the same JSON shape → original file bytes
+
+Both operations return an attachment download with `Content-Disposition`.
+The existing `/api/decrypt` remains unchanged in its supported payload formats.
 
 ## GitHub Actions → GHCR → Portainer
 
@@ -33,7 +70,7 @@ The GHCR image is **based on the repository's actual `owner/repo`**, converted t
 ```text
 ghcr.io/zeragonii/rxptool:latest
 ghcr.io/zeragonii/rxptool:edge
-ghcr.io/zeragonii/rxptool:1.0.3
+ghcr.io/zeragonii/rxptool:1.1.0
 ```
 
 The GitHub Actions workflow uses the repository's built-in `GITHUB_TOKEN` with `packages: write` for GHCR and `contents: write` for GitHub Releases. **No PAT or container registry password is needed in repository secrets.** GitHub packages can initially be **private**; after the first successful publish, go to your package's **Package settings → Change visibility → Public** if you want Portainer to pull without a registry login. Alternatively, keep the image private and configure GHCR registry credentials in Portainer. Ensure the GHCR package grants this repository permission to publish if a package with the same name already exists. See [GitHub's GHCR guide](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
@@ -46,31 +83,31 @@ This release changes `VERSION` to `1.0.3`. From the repository root:
 
 ```powershell
 git add .
-git commit -m "v1.0.3"
+git commit -m "v1.1.0"
 git push
-git tag v1.0.3
-git push origin v1.0.3
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
-Pushing `main` builds `:edge`. The new tag builds `:1.0.2` and `:latest` and creates the release. Don't reuse an existing tag.
+Pushing `main` builds `:edge`. The new tag builds `:1.1.0` and `:latest` and creates the release. Don't reuse an existing tag.
 
 ### B. Future releases (full copy/paste commands)
 
-For the next release, change `VERSION` to `1.0.4` and make your code updates. Then:
+For the next release, change `VERSION` to `1.1.1` and make your code updates. Then:
 
 ```bash
 git add .
-git commit -m "v1.0.4"
+git commit -m "v1.1.1"
 git push
-git tag v1.0.4
-git push origin v1.0.4
+git tag v1.1.1
+git push origin v1.1.1
 ```
 
 `VERSION` and the Git tag must match *at the tagged commit* or the release workflow stops. Changing code on `main` without tagging publishes `:edge` only. Do not move existing release tags.
 
 ### C. Deploy to Portainer (image published by GitHub)
 
-Once the `v1.0.3` workflow is green and the GHCR image is accessible to Portainer:
+Once the `v1.1.0` workflow is green and the GHCR image is accessible to Portainer:
 
 1. **Portainer → Stacks → Add stack → Web editor**.
 2. Paste [`portainer-stack.yml`](portainer-stack.yml) into the editor.
@@ -105,14 +142,14 @@ python -m pip install -r requirements-dev.txt
 python -m pytest -q
 ```
 
-Tests use **synthetic** encrypted payloads (no purchased content or account identifiers). The export-format tests verify combined NUL delimiters, ZIP contents, invalid formats, single guides, and v1.0.0 backward compatibility.
+Tests use **synthetic** encrypted payloads and files (no purchased content or actual account identifiers). They verify combined NUL delimiters, ZIP outputs, account-key mismatches, package integrity/tampering, exact-byte recovery, and v1.0.0 decryptor backward compatibility.
 
 ## Security and operational limits
 
 - This service **does not intentionally persist** submitted IDs, encrypted payloads, or recovered plaintext server-side; downloaded files remain on your device. When you choose a second export format, the browser resubmits the same input to the stateless API; the ID and encrypted payload remain in this page’s memory until you modify the inputs or close the page. Optional saved ID uses browser localStorage, readable by other scripts from the same site origin.
 - Uvicorn access logs are disabled by default. Reverse proxies, logs, and browser downloads may retain content/metadata.
 - Use HTTPS when accessing from other devices. **HTTP Basic authentication is not encryption**; don't expose port 8787 directly to the Internet. Putting it behind Nginx Proxy Manager + Authentik is also supported (ensure direct access to port 8787 is restricted).
-- Request body limit: 16 MiB; decompressed output total: 128 MiB; 1,000 guides; 512 chunks; 2 concurrent decryption requests. Reconfigure in `webapp/main.py` if necessary.
+- Request body limit: 24 MiB (encrypted payload limit unchanged; plaintext file limit 16 MiB); decompressed output total: 128 MiB; 1,000 guides; 512 chunks; 2 concurrent decryption requests. Reconfigure in `webapp/main.py` if necessary.
 - Runtime uses Python 3.12, a nonroot UID, a read-only filesystem with `/tmp` tmpfs, dropped capabilities, and `no-new-privileges`.
 - `.gitignore` and `.dockerignore` exclude `.env`, saved payload text and decrypted guide files. **Review `git status` before each push**, particularly if you have renamed sensitive files.
 - No third-party source guide datasets are included. Review your right to publish the derived decoder before making the repository public.
@@ -125,8 +162,9 @@ RXPTool/
 │   ├── workflows/publish.yml    # Tests, GHCR multiarch image, GitHub Release
 │   └── dependabot.yml           # Dependency update PRs
 ├── webapp/
-│   ├── main.py                  # API and output packaging
-│   └── static/                  # HTML / CSS / JS
+│   ├── main.py                  # API, encryption and output packaging
+│   ├── package_crypto.py        # Independent AES-GCM package format
+│   └── static/                  # Two HTML workspaces / CSS / JS
 ├── tests/test_app.py            # Synthetic API/decrypt tests
 ├── rxp_decrypt.py               # Python payload decoder
 ├── Dockerfile                   # Runtime image
@@ -157,7 +195,7 @@ A combined file normalises guide boundaries to one NUL delimiter, which matches 
 
 ## Troubleshooting: frontend errors behind a proxy
 
-- On v1.0.3 the page requests `/assets/app-v1.0.3.js` and `/assets/app-v1.0.3.css`. A browser or proxy serving the older `/assets/app.js` with newer HTML causes missing-element exceptions; hard-refresh and inspect Network > Disable cache if necessary.
+- On v1.1.0 the page requests `/assets/app-v1.1.0.js` and `/assets/app-v1.1.0.css`. A browser or proxy serving the older `/assets/app.js` with newer HTML causes missing-element exceptions; hard-refresh and inspect Network > Disable cache if necessary.
 - If `app.js:96` complains about a missing `downloadBtn`, that is specifically the **v1.0.0** frontend script. v1.0.1+ renamed this button to `downloadCombined` and `downloadSplit`. Pull the current GHCR image, redeploy and purge any proxy/CDN cache.
 - A CSP warning about *inline* scripts is not generated by this application's HTML; all first-party scripts are loaded via `src` with the `script-src 'self'` policy. Inspect the delivered HTML for injected `<script>` blocks or browser extensions. Do not add `unsafe-inline` to the CSP.
 - This release can't change headers or scripts injected by a reverse proxy, Cloudflare, authentication portal, or browser extension.

@@ -16,6 +16,7 @@ from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse, Response
 
+from webapp.package_crypto import PackageError, encrypt_package, decrypt_package
 from rxp_decrypt import (
     DecodeError,
     decode_chunk,
@@ -27,7 +28,8 @@ from rxp_decrypt import (
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC = BASE_DIR / "static"
-MAX_REQUEST_BYTES = 16 * 1024 * 1024
+MAX_REQUEST_BYTES = 24 * 1024 * 1024
+MAX_PACKAGE_BYTES = 16 * 1024 * 1024
 MAX_PLAINTEXT_BYTES = 128 * 1024 * 1024
 MAX_GUIDES = 1000
 MAX_CHUNKS = 512
@@ -71,13 +73,13 @@ async def protect_access(request: Request, call_next):
             headers={"WWW-Authenticate": 'Basic realm="RXP Decoder", charset="UTF-8"',
                      "Cache-Control": "no-store"},
         )
-    if request.url.path == "/api/decrypt" and request.method == "POST":
+    if request.url.path in ("/api/decrypt", "/api/encrypt", "/api/open-package") and request.method == "POST":
         try:
             length = int(request.headers.get("content-length", "0"))
         except ValueError:
             return failure(400, "Invalid request length")
         if length > MAX_REQUEST_BYTES:
-            return failure(413, "Upload too large (maximum 16 MiB)")
+            return failure(413, "Request too large (maximum 24 MiB)")
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Content-Security-Policy"] = (
@@ -102,6 +104,11 @@ async def index():
     return FileResponse(STATIC / "index.html", media_type="text/html")
 
 
+@app.get("/encrypt")
+async def encrypt_page():
+    return FileResponse(STATIC / "encrypt.html", media_type="text/html")
+
+
 @app.get("/favicon.ico")
 async def favicon():
     return FileResponse(STATIC / "favicon.ico", media_type="image/x-icon")
@@ -114,8 +121,10 @@ async def asset(asset: str):
         "app.js": "application/javascript",
         # Versioned asset URLs prevent old JS and new HTML from being mixed
         # by browser or reverse-proxy caches after a release.
-        "app-v1.0.3.css": "text/css",
-        "app-v1.0.3.js": "application/javascript",
+        "app-v1.1.0.css": "text/css",
+        "encrypt-v1.1.0.js": "application/javascript",
+        "app-v1.1.0.js": "application/javascript",
+        
         "favicon.svg": "image/svg+xml",
         "favicon-32.png": "image/png",
         "apple-touch-icon.png": "image/png",
@@ -125,7 +134,7 @@ async def asset(asset: str):
         return failure(404, "Not found")
     # Both URLs serve the same canonical asset. Only the versioned URLs
     # are referenced by this release's HTML.
-    canonical = {"app-v1.0.3.css": "app.css", "app-v1.0.3.js": "app.js"}.get(asset, asset)
+    canonical = {"app-v1.1.0.css": "app.css", "app-v1.1.0.js": "app.js", "encrypt-v1.1.0.js": "encrypt.js"}.get(asset, asset)
     return FileResponse(STATIC / canonical, media_type=media)
 
 
@@ -201,7 +210,7 @@ async def bounded_json(request: Request) -> Any:
     data = bytearray()
     async for part in request.stream():
         if len(data) + len(part) > MAX_REQUEST_BYTES:
-            raise DecodeError("Upload too large (maximum 16 MiB)")
+            raise DecodeError("Request too large (maximum 24 MiB)")
         data.extend(part)
     try:
         return json.loads(data)
@@ -251,3 +260,80 @@ async def decrypt(request: Request):
         # Don't reflect sensitive inputs or stack traces to the UI.
         return failure(500, "Unexpected server error while processing payload")
     return Response(content=output, media_type=content_type, headers=headers)
+
+
+def _validate_package_input(body: Any) -> tuple[str, bytes, str]:
+    if not isinstance(body, dict):
+        raise PackageError("Expected a JSON object")
+    account_id = body.get("battle_id")
+    encoded = body.get("content_base64")
+    filename = body.get("filename", "guide.txt")
+    if not isinstance(account_id, str) or not account_id.strip():
+        raise PackageError("Enter an ID for this package")
+    if len(account_id.strip().encode("utf-8")) > 256:
+        raise PackageError("ID must be at most 256 UTF-8 bytes")
+    if not isinstance(filename, str) or len(filename.encode("utf-8")) > 255:
+        raise PackageError("Invalid filename")
+    if not isinstance(encoded, str) or not encoded:
+        raise PackageError("Select a file first")
+    # Check before base64 decoding to bound memory usage.
+    if len(encoded) > ((MAX_PACKAGE_BYTES + 128 * 1024) * 4 // 3 + 8):
+        raise PackageError("File too large (maximum 16 MiB)")
+    try:
+        data = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError):
+        raise PackageError("Invalid file encoding") from None
+    if not data or len(data) > MAX_PACKAGE_BYTES + 128 * 1024:
+        raise PackageError("File must contain data and be no larger than 16 MiB")
+    return account_id.strip(), data, filename
+
+
+def _package_operation(action: str, account_id: str, data: bytes, filename: str):
+    try:
+        if action == "encrypt":
+            result = encrypt_package(data, account_id, filename)
+            # Verify the AEAD round-trip before presenting the download.
+            original, _ = decrypt_package(result, account_id)
+            if original != data:
+                raise RuntimeError("Package round-trip verification failed")
+            return result, "encrypted_guide.rxptool", "application/octet-stream", {
+                "X-Package-Verified": "true", "X-Input-Bytes": str(len(data))
+            }
+        original, restored_name = decrypt_package(data, account_id)
+        return original, restored_name, "application/octet-stream", {
+            "X-Package-Verified": "true", "X-Input-Bytes": str(len(data))
+        }
+    finally:
+        slots.release()
+
+
+async def _package_endpoint(request: Request, action: str):
+    if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
+        return failure(415, "Expected application/json")
+    try:
+        account_id, data, filename = _validate_package_input(await bounded_json(request))
+    except (DecodeError, PackageError) as exc:
+        return failure(413 if "too large" in str(exc).lower() else 400, str(exc))
+    if not slots.acquire(blocking=False):
+        return failure(429, "Server is busy; retry shortly")
+    try:
+        output, out_name, media, headers = await run_in_threadpool(
+            _package_operation, action, account_id, data, filename
+        )
+    except PackageError as exc:
+        return failure(422, str(exc))
+    except Exception:
+        return failure(500, "Unexpected server error while handling package")
+    safe_name = "".join(c if c.isascii() and (c.isalnum() or c in "._- " ) else "_" for c in out_name)[:180] or "package.bin"
+    headers["Content-Disposition"] = f'attachment; filename="{safe_name}"'
+    return Response(content=output, media_type=media, headers=headers)
+
+
+@app.post("/api/encrypt")
+async def encrypt_api(request: Request):
+    return await _package_endpoint(request, "encrypt")
+
+
+@app.post("/api/open-package")
+async def open_package_api(request: Request):
+    return await _package_endpoint(request, "open")
