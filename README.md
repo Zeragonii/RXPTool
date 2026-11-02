@@ -7,6 +7,7 @@ A small, stateless, self-hosted browser UI for the included account-keyed guide 
 ## Features
 
 - Clean responsive WebUI: file drop zone, file chooser, and pasted input.
+- **v1.0.3:** Versioned frontend asset URLs to prevent stale JavaScript from being paired with new HTML behind reverse proxies; descriptive error if an incompatible page is served. The strict CSP remains unchanged.
 - **v1.0.2:** Header icon doubles as the browser favicon, with SVG, ICO, PNG and Apple touch icon assets.
 - Optional browser-only ID remembrance; no accounts database or persistent payload storage.
 - Existing Python decoder (`rxp_decrypt.py`) used directly by the FastAPI backend.
@@ -32,7 +33,7 @@ The GHCR image is **based on the repository's actual `owner/repo`**, converted t
 ```text
 ghcr.io/zeragonii/rxptool:latest
 ghcr.io/zeragonii/rxptool:edge
-ghcr.io/zeragonii/rxptool:1.0.2
+ghcr.io/zeragonii/rxptool:1.0.3
 ```
 
 The GitHub Actions workflow uses the repository's built-in `GITHUB_TOKEN` with `packages: write` for GHCR and `contents: write` for GitHub Releases. **No PAT or container registry password is needed in repository secrets.** GitHub packages can initially be **private**; after the first successful publish, go to your package's **Package settings → Change visibility → Public** if you want Portainer to pull without a registry login. Alternatively, keep the image private and configure GHCR registry credentials in Portainer. Ensure the GHCR package grants this repository permission to publish if a package with the same name already exists. See [GitHub's GHCR guide](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
@@ -41,23 +42,9 @@ The GitHub Actions workflow uses the repository's built-in `GITHUB_TOKEN` with `
 
 Your existing repository is [`Zeragonii/RXPTool`](https://github.com/Zeragonii/RXPTool). Copy the updated files from this archive over your checked-out copy, preserving its `.git/` folder. Do **not** run `git init` or add a new remote.
 
-This release changes `VERSION` to `1.0.2`. From the repository root:
+This release changes `VERSION` to `1.0.3`. From the repository root:
 
 ```powershell
-git add .
-git commit -m "v1.0.2"
-git push
-git tag v1.0.2
-git push origin v1.0.2
-```
-
-Pushing `main` builds `:edge`. The new tag builds `:1.0.2` and `:latest` and creates the release. Don't reuse an existing tag.
-
-### B. Future releases (full copy/paste commands)
-
-For the next release, change `VERSION` to `1.0.3` and make your code updates. Then:
-
-```bash
 git add .
 git commit -m "v1.0.3"
 git push
@@ -65,17 +52,31 @@ git tag v1.0.3
 git push origin v1.0.3
 ```
 
+Pushing `main` builds `:edge`. The new tag builds `:1.0.2` and `:latest` and creates the release. Don't reuse an existing tag.
+
+### B. Future releases (full copy/paste commands)
+
+For the next release, change `VERSION` to `1.0.4` and make your code updates. Then:
+
+```bash
+git add .
+git commit -m "v1.0.4"
+git push
+git tag v1.0.4
+git push origin v1.0.4
+```
+
 `VERSION` and the Git tag must match *at the tagged commit* or the release workflow stops. Changing code on `main` without tagging publishes `:edge` only. Do not move existing release tags.
 
 ### C. Deploy to Portainer (image published by GitHub)
 
-Once the `v1.0.2` workflow is green and the GHCR image is accessible to Portainer:
+Once the `v1.0.3` workflow is green and the GHCR image is accessible to Portainer:
 
 1. **Portainer → Stacks → Add stack → Web editor**.
 2. Paste [`portainer-stack.yml`](portainer-stack.yml) into the editor.
 3. Add Portainer **environment variables**: `RXP_USERNAME` and `RXP_PASSWORD` (set both for authentication). Optionally set `RXP_IMAGE` to `ghcr.io/zeragonii/rxptool:edge` to run the bleeding-edge branch instead of `latest`.
 4. Deploy and open **http://YOUR-DOCKER-HOST:8787** (prefer HTTPS through your reverse proxy).
-5. On a later release, use Portainer's **Pull latest image / Re-pull image and redeploy** option when updating the stack. If you use a version-pinned image such as `:1.0.2`, update the tag in `RXP_IMAGE` for each release.
+5. On a later release, use Portainer's **Pull latest image / Re-pull image and redeploy** option when updating the stack. If you use a version-pinned image such as `:1.0.3`, update the tag in `RXP_IMAGE` for each release.
 
 The Compose stack **pulls the published container**, so no Python, Dockerfile upload, local Docker build, or bind-mounted source directory is required on your Portainer host. GHCR package visibility and Portainer registry credentials determine whether it can pull the image.
 
@@ -153,3 +154,10 @@ Use `POST /api/decrypt` with JSON:
 `format` supports `combined` (one `decrypted_guides.txt` with `0x00` delimiters), `split` (ZIP of separate text guides), and `auto` (default: old behaviour). The `X-Output-Format` response header identifies the format returned.
 
 A combined file normalises guide boundaries to one NUL delimiter, which matches the input convention for guide splitting; it does not necessarily preserve redundant leading, repeated, or trailing NULs present in the original decompressed chunks. Both exports preserve each individual guide's bytes.
+
+## Troubleshooting: frontend errors behind a proxy
+
+- On v1.0.3 the page requests `/assets/app-v1.0.3.js` and `/assets/app-v1.0.3.css`. A browser or proxy serving the older `/assets/app.js` with newer HTML causes missing-element exceptions; hard-refresh and inspect Network > Disable cache if necessary.
+- If `app.js:96` complains about a missing `downloadBtn`, that is specifically the **v1.0.0** frontend script. v1.0.1+ renamed this button to `downloadCombined` and `downloadSplit`. Pull the current GHCR image, redeploy and purge any proxy/CDN cache.
+- A CSP warning about *inline* scripts is not generated by this application's HTML; all first-party scripts are loaded via `src` with the `script-src 'self'` policy. Inspect the delivered HTML for injected `<script>` blocks or browser extensions. Do not add `unsafe-inline` to the CSP.
+- This release can't change headers or scripts injected by a reverse proxy, Cloudflare, authentication portal, or browser extension.

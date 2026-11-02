@@ -17,3 +17,10 @@
 
 /* v1.0.2: header and browser favicon share the same brand SVG. */
 .brand-icon{display:block;background:none;border:0;flex:none}
+
+/* Visible fallback if a proxy/browser mixes HTML and JavaScript releases. */
+.frontend-mismatch {
+  position: relative; z-index: 100; margin: 1rem auto; max-width: 760px;
+  padding: 1rem 1.25rem; border: 1px solid #fb7185; border-radius: 12px;
+  background: #301924; color: #ffe4e6; font: 500 14px/1.6 system-ui, sans-serif;
+}

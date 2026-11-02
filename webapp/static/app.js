@@ -1,6 +1,28 @@
 'use strict';
 (() => {
   const byId = (id) => document.getElementById(id);
+  // Do not crash with an opaque addEventListener error if a caching layer
+  // accidentally serves a page and script from different releases.
+  const expectedIds = [
+    'decryptForm', 'battleId', 'rememberId', 'payloadFile', 'payloadText',
+    'error', 'submitBtn', 'submitLabel', 'dropZone', 'showId', 'tabUpload',
+    'tabPaste', 'uploadPanel', 'pastePanel', 'clearFile', 'fileTitle',
+    'fileDescription', 'downloadCombined', 'downloadSplit', 'downloadStatus',
+    'emptyState', 'resultState', 'loadingState', 'guideCount', 'chunkCount',
+    'outputSize', 'previewSuffix', 'filePreview'
+  ];
+  const missingIds = expectedIds.filter((id) => !byId(id));
+  if (missingIds.length) {
+    const message = 'RXP Decoder assets are out of sync. Refresh the page with Ctrl+Shift+R. ' +
+      'Missing UI elements: ' + missingIds.join(', ');
+    console.error(message);
+    const notice = document.createElement('p');
+    notice.className = 'frontend-mismatch';
+    notice.setAttribute('role', 'alert');
+    notice.textContent = message;
+    document.body.prepend(notice);
+    return;
+  }
   const form = byId('decryptForm');
   const battleId = byId('battleId');
   const remember = byId('rememberId');

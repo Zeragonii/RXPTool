@@ -182,3 +182,26 @@ def test_favicon_assets_reuse_header_icon():
     assert 'M13 14H26L18 22H27' in path_data
     assert 'M12 27H24' in path_data
     assert client.get('/assets/unknown.png').status_code == 404
+
+
+def test_versioned_asset_urls_and_strict_csp():
+    """Prevent the old-JS/new-HTML mismatch observed through proxy caches."""
+    import re
+
+    page = client.get('/')
+    assert page.status_code == 200
+    assert 'src="/assets/app-v1.0.3.js"' in page.text
+    assert 'href="/assets/app-v1.0.3.css"' in page.text
+    assert 'v1.0.3' in page.text
+    assert not re.search(r'<script(?![^>]*\bsrc=)', page.text, flags=re.I)
+    assert "script-src 'self'" in page.headers['content-security-policy']
+    assert "'unsafe-inline'" not in page.headers['content-security-policy']
+    for asset, media in [('app-v1.0.3.js', 'application/javascript'), ('app-v1.0.3.css', 'text/css')]:
+        response = client.get('/assets/' + asset)
+        assert response.status_code == 200
+        assert response.headers['content-type'].startswith(media)
+        assert response.headers['cache-control'] == 'no-store'
+        assert response.content == client.get('/assets/' + asset.replace('-v1.0.3', '')).content
+    assert 'downloadCombined' in client.get('/assets/app-v1.0.3.js').text
+    assert "missingIds" in client.get('/assets/app-v1.0.3.js').text
+    assert client.get('/assets/app-v1.0.2.js').status_code == 404

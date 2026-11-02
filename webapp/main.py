@@ -112,6 +112,10 @@ async def asset(asset: str):
     allowed_assets = {
         "app.css": "text/css",
         "app.js": "application/javascript",
+        # Versioned asset URLs prevent old JS and new HTML from being mixed
+        # by browser or reverse-proxy caches after a release.
+        "app-v1.0.3.css": "text/css",
+        "app-v1.0.3.js": "application/javascript",
         "favicon.svg": "image/svg+xml",
         "favicon-32.png": "image/png",
         "apple-touch-icon.png": "image/png",
@@ -119,7 +123,10 @@ async def asset(asset: str):
     media = allowed_assets.get(asset)
     if media is None:
         return failure(404, "Not found")
-    return FileResponse(STATIC / asset, media_type=media)
+    # Both URLs serve the same canonical asset. Only the versioned URLs
+    # are referenced by this release's HTML.
+    canonical = {"app-v1.0.3.css": "app.css", "app-v1.0.3.js": "app.js"}.get(asset, asset)
+    return FileResponse(STATIC / canonical, media_type=media)
 
 
 def decode_payload(account_id: str, payload: str) -> tuple[list[bytes], int]:

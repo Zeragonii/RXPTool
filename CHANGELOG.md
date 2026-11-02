@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.3 — 2026-11-02
+
+- Switched the page to versioned JS and CSS asset URLs so browser/proxy caches cannot pair old JavaScript with new markup.
+- Added visible error information for incompatible frontend DOM rather than throwing an unhelpful null `addEventListener` exception.
+- Preserved the strict `script-src 'self'` CSP, without allowing inline scripts.
+- Added API tests for asset consistency, strict CSP, and no inline first-party scripts.
+
+
 ## v1.0.2 — 2026-11-02
 
 - Reused the original top-left RXP Decoder icon as the browser favicon (same SVG path data and colours).
