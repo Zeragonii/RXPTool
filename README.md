@@ -1,4 +1,4 @@
-# RXPTool v2.0.0
+# RXPTool v2.0.2
 
 Self-hosted, account-keyed RestedXP import editor. **One document format, two screens.**
 
@@ -61,7 +61,7 @@ docker compose up --build -d
 python rxp_decrypt.py --payload-file original_import.txt --id 'YourName#1234' --output editable_guides.txt
 ```
 
-## API (v2.0.0)
+## API (v2.0.2)
 
 - `GET /health`: status and version.
 - `POST /api/decrypt`: JSON `{ "battle_id": "YourName#1234", "payload": "<full import>" }`. Only optional `"format": "editable"` is accepted. Returns `editable_guides.txt`.
@@ -82,10 +82,10 @@ Tag/release:
 
 ```sh
 git add .
-git commit -m "v2.0.0"
+git commit -m "v2.0.2"
 git push
-git tag v2.0.0
-git push origin v2.0.0
+git tag v2.0.2
+git push origin v2.0.2
 ```
 
 The GitHub Actions workflow validates JavaScript and Python, tests the application and builds/publishes multi-architecture GHCR images. The image is published on a version tag; push code before tagging it.

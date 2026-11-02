@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.0.2 — 2026-11-02
+
+- Fix the stale `test_wrong_account_rejected` assertion after restoring the intentional non-enforcement of legacy account-key fingerprints. A different output encryption ID is accepted and the generated payload decrypts under that ID.
+- Add regression coverage showing that editing the legacy `#!account_key_fingerprint` metadata does not block encryption.
+- Align `VERSION`, API version, HTML footer, cache-busting static asset URLs, and version-sensitive tests at `2.0.2`.
+- Retain the v2.0.1 behaviour and all v2.0.0 UI cleanup unchanged; the fingerprint is informational only.
+
 ## v2.0.0 — 2026-11-02
 
 - Consolidate the WebUI into **Decrypt → editable_guides.txt → Encrypt → rebuilt_import.txt**.

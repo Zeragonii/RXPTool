@@ -2,12 +2,9 @@
 from __future__ import annotations
 
 import base64
-import json
-import re
 import zlib
 from pathlib import Path
 
-import pytest
 from fastapi.testclient import TestClient
 
 from rxp_decrypt import derive_base, initial_permutation, xor_stream
@@ -49,7 +46,7 @@ def test_v2_screens_have_one_export_no_legacy_controls():
     assert 'id="encryptManifest"' not in encrypt.text
     assert 'id="recoveryForm"' not in encrypt.text
     assert 'id="recoverSubmit"' not in encrypt.text
-    assert 'v2.0.0' in home.text and 'v2.0.0' in encrypt.text
+    assert 'v2.0.2' in home.text and 'v2.0.2' in encrypt.text
     assert 'RXP <strong>Tool</strong>' in home.text
     assert 'RXP <strong>Tool</strong>' in encrypt.text
     assert '{{RXP_HEADLINE}}' not in home.text
@@ -69,12 +66,12 @@ def test_headline_plaintext_html_escape_and_empty_fallback(monkeypatch):
 
 
 def test_only_v2_asset_names_exist():
-    for name in ['app-v2.0.0.js', 'app-v2.0.0.css', 'encrypt-v2.0.0.js']:
+    for name in ['app-v2.0.2.js', 'app-v2.0.2.css', 'encrypt-v2.0.2.js']:
         assert client.get('/assets/' + name).status_code == 200
     for name in ['app-v1.1.6.js', 'app-v1.1.6.css', 'encrypt-v1.1.6.js', 'app.js']:
         assert client.get('/assets/' + name).status_code == 404
     assert 'default-src' in client.get('/').headers['content-security-policy']
-    assert client.get('/health').json() == {'status': 'ok', 'version': '2.0.0'}
+    assert client.get('/health').json() == {'status': 'ok', 'version': '2.0.2'}
 
 
 def test_removed_endpoints_not_exposed():
@@ -131,6 +128,27 @@ def test_account_key_fingerprint_is_not_enforced_as_in_uploaded_project():
     assert b'#!account_key_fingerprint=' in doc
 
 
+def test_legacy_fingerprint_is_informational_not_an_encryption_gate():
+    # Existing editable files may contain a fingerprint from another ID or
+    # an arbitrarily edited fingerprint. Encryption uses the ID entered now.
+    doc = decrypted()
+    lines = doc.splitlines(keepends=True)
+    doc_with_edited_fingerprint = b''.join(
+        b'#!account_key_fingerprint="metadata-not-verified"\n'
+        if line.startswith(b'#!account_key_fingerprint=') else line
+        for line in lines
+    )
+    assert doc_with_edited_fingerprint != doc
+    target_id = 'DifferentOutput#2607'
+    response = encrypt_doc(doc_with_edited_fingerprint, account=target_id)
+    assert response.status_code == 200, response.text
+    recovered = client.post('/api/decrypt', json={
+        'battle_id': target_id, 'payload': response.text,
+    })
+    assert recovered.status_code == 200, recovered.text
+    assert b'#name Welcome' in recovered.content
+
+
 def test_invalid_malformed_and_oversized_requests():
     assert client.post('/api/decrypt', content='abc',headers={'content-type':'text/plain'}).status_code == 415
     assert client.post('/api/encrypt', json={'battle_id':ACCOUNT,'content_base64':'???'}).status_code == 400
@@ -142,4 +160,4 @@ def test_removed_modules_not_shipped():
     root = Path(__file__).resolve().parents[1]
     for name in ['import_bundle','manifest_rebuild','package_crypto','native_encrypt']:
         assert not (root / 'webapp' / (name + '.py')).exists()
-    assert (root / 'VERSION').read_text().strip() == '2.0.0'
+    assert (root / 'VERSION').read_text().strip() == '2.0.2'

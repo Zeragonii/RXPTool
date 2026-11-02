@@ -22,7 +22,7 @@ from webapp.editable_document import (DocumentError, is_editable_document,
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC = BASE_DIR / 'static'
-VERSION = '2.0.0'
+VERSION = '2.0.2'
 MAX_REQUEST_BYTES = 32 * 1024 * 1024
 MAX_DOCUMENT_BYTES = 16 * 1024 * 1024
 MAX_PLAINTEXT_BYTES = 128 * 1024 * 1024
@@ -116,9 +116,9 @@ async def favicon():
 
 
 ASSETS = {
-    'app-v2.0.0.css': ('app.css', 'text/css'),
-    'app-v2.0.0.js': ('app.js', 'application/javascript'),
-    'encrypt-v2.0.0.js': ('encrypt.js', 'application/javascript'),
+    'app-v2.0.2.css': ('app.css', 'text/css'),
+    'app-v2.0.2.js': ('app.js', 'application/javascript'),
+    'encrypt-v2.0.2.js': ('encrypt.js', 'application/javascript'),
     'favicon.svg': ('favicon.svg', 'image/svg+xml'),
     'favicon-32.png': ('favicon-32.png', 'image/png'),
     'apple-touch-icon.png': ('apple-touch-icon.png', 'image/png'),
