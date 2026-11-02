@@ -55,9 +55,6 @@ def rebuild_from_manifest(manifest_bytes: bytes, plaintext: bytes, account_id: s
     if not 1 <= len(chunks) <= MAX_CHUNKS:
         raise RebuildError("Manifest has no chunks or too many chunks")
     fingerprint = hashlib.sha256(derive_base(account_id)).hexdigest()
-    if source.get("account_key_fingerprint") != fingerprint:
-        raise RebuildError("ID does not match the original import's key fingerprint; same-account rebuilding only")
-
     framing = source.get("framing")
     if not isinstance(framing, dict) or framing.get("input_kind") != "framed-import":
         raise RebuildError("A full import header and footer are required; standalone chunks cannot be rebuilt as a native import")
