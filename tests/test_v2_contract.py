@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import zlib
 from pathlib import Path
+import re
 
 from fastapi.testclient import TestClient
 
@@ -46,7 +47,7 @@ def test_v2_screens_have_one_export_no_legacy_controls():
     assert 'id="encryptManifest"' not in encrypt.text
     assert 'id="recoveryForm"' not in encrypt.text
     assert 'id="recoverSubmit"' not in encrypt.text
-    assert 'v2.0.2' in home.text and 'v2.0.2' in encrypt.text
+    assert 'v2.0.3' in home.text and 'v2.0.3' in encrypt.text
     assert 'RXP <strong>Tool</strong>' in home.text
     assert 'RXP <strong>Tool</strong>' in encrypt.text
     assert '{{RXP_HEADLINE}}' not in home.text
@@ -66,12 +67,12 @@ def test_headline_plaintext_html_escape_and_empty_fallback(monkeypatch):
 
 
 def test_only_v2_asset_names_exist():
-    for name in ['app-v2.0.2.js', 'app-v2.0.2.css', 'encrypt-v2.0.2.js']:
+    for name in ['app-v2.0.3.js', 'app-v2.0.3.css', 'encrypt-v2.0.3.js']:
         assert client.get('/assets/' + name).status_code == 200
     for name in ['app-v1.1.6.js', 'app-v1.1.6.css', 'encrypt-v1.1.6.js', 'app.js']:
         assert client.get('/assets/' + name).status_code == 404
     assert 'default-src' in client.get('/').headers['content-security-policy']
-    assert client.get('/health').json() == {'status': 'ok', 'version': '2.0.2'}
+    assert client.get('/health').json() == {'status': 'ok', 'version': '2.0.3'}
 
 
 def test_removed_endpoints_not_exposed():
@@ -98,7 +99,8 @@ def test_editable_is_the_only_accepted_input_and_round_trip():
     assert output.status_code == 200, output.text
     assert output.headers['x-guide-count'] == '1'
     assert output.headers['x-package-verified'] == 'true'
-    assert output.headers['content-disposition'].endswith('"rebuilt_import.txt"')
+    assert output.headers['content-disposition'].startswith('attachment; filename="editable_guides!UnitTest#2026_')
+    assert output.headers['content-disposition'].endswith('.txt"')
     resp = client.post('/api/decrypt', json={'battle_id':ACCOUNT,'payload':output.text})
     assert resp.status_code == 200
     assert resp.content == doc
@@ -160,4 +162,104 @@ def test_removed_modules_not_shipped():
     root = Path(__file__).resolve().parents[1]
     for name in ['import_bundle','manifest_rebuild','package_crypto','native_encrypt']:
         assert not (root / 'webapp' / (name + '.py')).exists()
-    assert (root / 'VERSION').read_text().strip() == '2.0.2'
+    assert (root / 'VERSION').read_text().strip() == '2.0.3'
+
+
+def test_decrypt_preserves_uploaded_stem_and_encrypt_names_import():
+    title = 'Forever Leveling Guide - Both Factions'
+    filename = title + '!Original#12345.txt'
+    response = client.post('/api/decrypt', json={
+        'battle_id': ACCOUNT, 'payload': encrypted_sample(),
+        'source_filename': filename,
+    })
+    assert response.status_code == 200, response.text
+    assert response.headers['content-disposition'] == f'attachment; filename="{title}.txt"'
+    assert b'#!source_name="Forever Leveling Guide - Both Factions"\n' in response.content
+    second_id = 'DifferentUser#2607'
+    encrypted = client.post('/api/encrypt', json={
+        'battle_id': second_id, 'filename': 'renamed-editable-file.txt',
+        'download_timestamp': '2026-11-04_15-07',
+        'content_base64': base64.b64encode(response.content).decode(),
+    })
+    assert encrypted.status_code == 200, encrypted.text
+    assert encrypted.headers['content-disposition'] == (
+        f'attachment; filename="{title}!{second_id}_2026-11-04_15-07.txt"'
+    )
+    assert encrypted.headers['x-package-verified'] == 'true'
+    red = client.post('/api/decrypt', json={
+        'battle_id': second_id, 'payload': encrypted.text,
+        'source_filename': f'{title}!{second_id}_2026-11-04_15-07.txt',
+    })
+    assert red.status_code == 200, red.text
+    assert red.headers['content-disposition'] == f'attachment; filename="{title}.txt"'
+    assert b'#name Welcome' in red.content
+
+
+def test_legacy_editable_document_uses_uploaded_filename():
+    legacy = decrypted()  # no source title field
+    assert b'#!source_name=' not in legacy
+    encrypted = client.post('/api/encrypt', json={
+        'battle_id': ACCOUNT,
+        'filename': 'Old Guides!.txt',
+        'download_timestamp': '2026-11-04_15-08',
+        'content_base64': base64.b64encode(legacy).decode(),
+    })
+    assert encrypted.status_code == 200, encrypted.text
+    assert encrypted.headers['content-disposition'] == (
+        'attachment; filename="Old Guides!UnitTest#2026_2026-11-04_15-08.txt"'
+    )
+
+
+def test_pasted_payload_uses_generic_fallback_without_broken_name():
+    pasted = client.post('/api/decrypt', json={
+        'battle_id': ACCOUNT, 'payload': encrypted_sample()})
+    assert pasted.status_code == 200
+    assert pasted.headers['content-disposition'] == 'attachment; filename="editable_guides.txt"'
+    assert b'#!source_name=' not in pasted.content
+
+
+def test_windows_unfriendly_characters_removed_and_unicode_supported():
+    doc = client.post('/api/decrypt', json={
+        'battle_id': ACCOUNT, 'payload': encrypted_sample(),
+        'source_filename': 'C:\\uploads\\CON:Guide?🔥!Old#123',
+    })
+    assert doc.status_code == 200, doc.text
+    content_disposition = doc.headers['content-disposition']
+    assert 'filename*=UTF-8' in content_disposition
+    assert 'CON_Guide_%F0%9F%94%A5.txt' in content_disposition
+    assert b'#!source_name=' in doc.content
+    rebuilt = client.post('/api/encrypt', json={
+        'battle_id': 'Name:With*Invalid\\Characters#001',
+        'download_timestamp': '2026-11-04_15-09',
+        'filename': 'whatever.txt',
+        'content_base64': base64.b64encode(doc.content).decode(),
+    })
+    assert rebuilt.status_code == 200, rebuilt.text
+    name = rebuilt.headers['content-disposition']
+    assert 'filename*=UTF-8' in name
+    assert 'Name_With_Invalid_Characters#001' in name
+    assert '2026-11-04_15-09' in name
+    assert not re.search(r'[<>:"\\|?*]', name.split('filename*=')[-1])
+
+
+def test_windows_reserved_names_and_length_limit():
+    from webapp.download_names import source_stem, encrypted_filename, safe_timestamp
+    assert source_stem('CON!Someone#123') == '_CON'
+    assert source_stem('HELLO.txt') == 'HELLO'
+    assert source_stem('D:/a/b/HELLO!old#tag.txt') == 'HELLO'
+    assert source_stem('HELLO!old#tag_2026-11-04_15-07.txt') == 'HELLO'
+    name = encrypted_filename('A'*500, 'X'*500, '2026-11-04_15-07')
+    assert len(name.encode()) < 240
+    assert name.endswith('_2026-11-04_15-07.txt')
+    assert safe_timestamp('2026-02-31_15-07') != '2026-02-31_15-07'
+
+
+def test_invalid_source_metadata_is_rejected_not_silently_ignored():
+    doc = client.post('/api/decrypt', json={
+        'battle_id': ACCOUNT, 'payload': encrypted_sample(),
+        'source_filename': 'Real Name!Account#123'
+    }).content
+    broken = doc.replace(b'#!source_name="Real Name"', b'#!source_name=123')
+    out = encrypt_doc(broken)
+    assert out.status_code == 422, out.text
+    assert 'Invalid #!source_name' in out.text

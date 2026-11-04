@@ -1,12 +1,12 @@
-# RXPTool v2.0.2
+# RXPTool v2.0.3
 
 Self-hosted, account-keyed RestedXP import editor. **One document format, two screens.**
 
 ## Workflow
 
-1. **Decrypt** (`/`): upload/paste the original, complete encrypted import and enter the matching account ID. Download **`editable_guides.txt`**.
+1. **Decrypt** (`/`): upload/paste the original, complete encrypted import and enter the matching account ID. Download **`<original filename before !>.txt`** (or `editable_guides.txt` when pasting).
 2. Edit your guide text, including steps, names or tags. Keep document directives such as `#!RXPTOOL/1`, `#!guide`, `#!endguide`, `#!empty`, `#!chunk` and `#!endchunk` intact unless intentionally changing guide boundaries.
-3. **Encrypt** (`/encrypt`): upload the edited `editable_guides.txt` and enter the **ID to use for output encryption**. Download **`rebuilt_import.txt`**.
+3. **Encrypt** (`/encrypt`): upload the edited TXT and enter the **ID to use for output encryption**. Download **`<original filename>!<output Battle.net ID>_YYYY-MM-DD_HH-mm.txt`** (Windows-safe, browser-local timestamp).
 4. RXPTool rebuilds native import framing, dynamically recalculates guide count, NUL slots and Adler-32 checksums, recompresses and freshly encrypts the chunks. It decrypts the rebuilt output again and checks the exact raw chunk bytes and guide count before returning it.
 
 **Game compatibility:** guides can still be skipped by the RestedXP addon for incompatible game versions, factions or seasonal tags. The v1.1.x Retail test established that the native import pipeline can load correctly when guide metadata is compatible. RXPTool does not rewrite quests/zones for other game versions.
@@ -61,11 +61,11 @@ docker compose up --build -d
 python rxp_decrypt.py --payload-file original_import.txt --id 'YourName#1234' --output editable_guides.txt
 ```
 
-## API (v2.0.2)
+## API (v2.0.3)
 
 - `GET /health`: status and version.
-- `POST /api/decrypt`: JSON `{ "battle_id": "YourName#1234", "payload": "<full import>" }`. Only optional `"format": "editable"` is accepted. Returns `editable_guides.txt`.
-- `POST /api/encrypt`: JSON `{ "battle_id": "YourName#1234", "content_base64": "<base64 of editable TXT>" }`. Returns `rebuilt_import.txt`.
+- `POST /api/decrypt`: JSON `{ "battle_id": "YourName#1234", "payload": "<full import>" }`. Only optional `"format": "editable"` is accepted. Optional `source_filename` preserves the title before the first `!` in the editable file. Returns `<source>.txt` (fallback `editable_guides.txt`).
+- `POST /api/encrypt`: JSON `{ "battle_id": "YourName#1234", "content_base64": "<base64 of editable TXT>" }`. Optional `filename` and `download_timestamp` (`YYYY-MM-DD_HH-mm`, browser-local) control the Windows-safe download name. The embedded source name, if present, takes precedence over the upload filename. Returns `<source>!<ID>_<timestamp>.txt`.
 
 Other formats or endpoints are no longer supported. API request limits, basic authentication, concurrency limits, CSP and read-only container settings remain enforced.
 
@@ -82,10 +82,10 @@ Tag/release:
 
 ```sh
 git add .
-git commit -m "v2.0.2"
+git commit -m "v2.0.3"
 git push
-git tag v2.0.2
-git push origin v2.0.2
+git tag v2.0.3
+git push origin v2.0.3
 ```
 
 The GitHub Actions workflow validates JavaScript and Python, tests the application and builds/publishes multi-architecture GHCR images. The image is published on a version tag; push code before tagging it.

@@ -15,7 +15,7 @@
   const id = get('battleId'), fileInput = get('payloadFile'), paste = get('payloadText');
   const submit = get('submitBtn'), error = get('error'), drop = get('dropZone');
   const remember = get('rememberId'), key = 'rxp-decode-account-id';
-  let mode = 'upload', selected = null, result = null, epoch = 0;
+  let mode = 'upload', selected = null, result = null, resultFilename = 'editable_guides.txt', epoch = 0;
   const visible = (target, state) => { get(target).hidden = !state; };
   const fail = (message) => { error.textContent = message; error.hidden = false; };
   const clearError = () => { error.textContent = ''; error.hidden = true; };
@@ -67,6 +67,13 @@
     visible('clearFile', false);
   });
   paste.addEventListener('input', reset);
+  const filenameFromResponse = (response, fallback) => {
+    const cd = response.headers.get('Content-Disposition') || '';
+    const extended = cd.match(/filename\*=UTF-8''([^;]+)/i);
+    if (extended) { try { return decodeURIComponent(extended[1]); } catch (_) {} }
+    const normal = cd.match(/filename="([^"]+)"/i);
+    return normal ? normal[1] : fallback;
+  };
   const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob), a = document.createElement('a');
     a.href = url; a.download = filename; a.hidden = true;
@@ -74,8 +81,10 @@
     setTimeout(() => URL.revokeObjectURL(url), 3000);
   };
   get('downloadEditable').addEventListener('click', () => {
-    if (result) downloadBlob(result, 'editable_guides.txt');
-    get('downloadStatus').textContent = 'Downloaded editable_guides.txt · Open Encrypt when your edits are ready.';
+    if (result) {
+      downloadBlob(result, resultFilename);
+      get('downloadStatus').textContent = `Downloaded ${resultFilename} · Open Encrypt when your edits are ready.`;
+    }
   });
   get('decryptForm').addEventListener('submit', async (event) => {
     event.preventDefault(); if (submit.disabled) return;
@@ -87,7 +96,8 @@
       try { payload = await selected.text(); } catch (_) { fail('Unable to read the selected file.'); return; }
     } else payload = paste.value;
     if (!payload.trim()) { fail('The encrypted import is empty.'); return; }
-    const body = JSON.stringify({battle_id: account, payload, format: 'editable'});
+    const body = JSON.stringify({battle_id: account, payload, format: 'editable',
+      ...(mode === 'upload' && selected ? {source_filename: selected.name} : {})});
     if (new TextEncoder().encode(body).length > 32 * 1024 * 1024) { fail('Payload exceeds 32 MiB request limit.'); return; }
     saveId(); reset(); clearError();
     const request = epoch; submit.disabled = true;
@@ -103,6 +113,7 @@
       }
       const blob = await response.blob(); if (request !== epoch) return;
       result = blob;
+      resultFilename = filenameFromResponse(response, 'editable_guides.txt');
       const count = Number(response.headers.get('X-Guide-Count') || 0);
       const chunks = Number(response.headers.get('X-Chunk-Count') || 0);
       get('guideCount').textContent = count.toLocaleString();

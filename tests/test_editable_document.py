@@ -1,4 +1,4 @@
-"""v2.0.2: editable text does not depend on stored plaintext offsets."""
+"""v2.0.3: editable text does not depend on stored plaintext offsets."""
 import base64
 import json
 import re
@@ -142,6 +142,19 @@ def test_actual_191_guide_import_roundtrip_when_available():
 
 def test_ui_assets_and_api_format_exist():
     assert 'id="downloadEditable"' in client.get('/').text
-    assert client.get('/assets/app-v2.0.2.js').status_code == 200
-    assert client.get('/assets/encrypt-v2.0.2.js').status_code == 200
+    assert client.get('/assets/app-v2.0.3.js').status_code == 200
+    assert client.get('/assets/encrypt-v2.0.3.js').status_code == 200
     assert 'Editable guide TXT' in client.get('/encrypt').text
+
+
+def test_optional_source_name_changes_only_editable_metadata():
+    source, _, raws = get_sample()
+    original, _, _ = make_editable_document(source, ID)
+    titled, count, chunks = make_editable_document(source, ID, source_name='Dungeon Guides')
+    assert b'#!source_name="Dungeon Guides"\n' in titled
+    assert b'#!source_name=' not in original
+    imported1, _, _, data1 = rebuild_from_editable_document(original, ID)
+    imported2, _, _, data2 = rebuild_from_editable_document(titled, ID)
+    assert data1 == data2 == raws
+    assert count == 3 and chunks == 2
+    assert raw_from_import(imported1) == raw_from_import(imported2)

@@ -16,7 +16,7 @@
   const id = get('encryptId'), upload = get('encryptFile');
   const drop = get('encryptDrop'), error = get('encryptError');
   const submit = get('encryptSubmit'), remember = get('rememberEncryptId');
-  let selected = null, result = null, epoch = 0;
+  let selected = null, result = null, resultFilename = 'rebuilt_import.txt', epoch = 0;
   const show = (name, state) => { get(name).hidden = !state; };
   const size = n => n >= 1048576 ? (n/1048576).toFixed(1)+' MiB' : Math.max(1,Math.round(n/1024))+' KiB';
   const fail = message => { error.textContent = message; error.hidden = false; };
@@ -56,6 +56,17 @@
     const parts=[];for(let i=0;i<bytes.length;i+=16384){parts.push(String.fromCharCode(...bytes.subarray(i,i+16384)));}
     return btoa(parts.join(''));
   };
+  const filenameFromResponse = (response, fallback) => {
+    const cd = response.headers.get('Content-Disposition') || '';
+    const extended = cd.match(/filename\*=UTF-8''([^;]+)/i);
+    if (extended) { try { return decodeURIComponent(extended[1]); } catch (_) {} }
+    const normal = cd.match(/filename="([^"]+)"/i);
+    return normal ? normal[1] : fallback;
+  };
+  const localTimestamp = () => {
+    const d = new Date(), pad = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`;
+  };
   get('encryptForm').addEventListener('submit',async e=>{
     e.preventDefault(); if(submit.disabled)return;
     const account=id.value.trim();
@@ -70,11 +81,13 @@
       const encoded=toBase64(new Uint8Array(await selected.arrayBuffer()));
       const response=await fetch('/api/encrypt',{method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({battle_id:account,content_base64:encoded}),cache:'no-store'});
+        body:JSON.stringify({battle_id:account,content_base64:encoded,
+          filename:selected.name,download_timestamp:localTimestamp()}),cache:'no-store'});
       if(!response.ok){let message=`Encryption failed (HTTP ${response.status})`;
         try{message=(await response.json()).error||message;}catch(_){} throw new Error(message);}
       const blob=await response.blob();if(request!==epoch)return;
       result=blob;
+      resultFilename=filenameFromResponse(response, 'rebuilt_import.txt');
       get('encryptSuccessTitle').textContent='Import rebuilt and verified';
       get('encryptSuccessSubtitle').textContent='Fresh encryption · full import framing';
       get('encryptResultHint').textContent='RXPTool independently decrypted the result and verified the reconstructed plaintext and guide count.';
@@ -88,7 +101,7 @@
   get('downloadEncrypted').addEventListener('click',()=>{
     if(!result)return;
     const url=URL.createObjectURL(result),a=document.createElement('a');
-    a.href=url;a.download='rebuilt_import.txt';a.hidden=true;
+    a.href=url;a.download=resultFilename;a.hidden=true;
     document.body.append(a);a.click();a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),3000);
   });

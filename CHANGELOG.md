@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.0.3 — 2026-11-04
+
+- Preserve the original title (everything before the first `!` in the uploaded filename) when downloading editable guide TXT, rather than always `editable_guides.txt`.
+- Include optional `#!source_name` metadata in new editable files, so the original title survives rename/edit/upload while older editable documents remain compatible.
+- Name rebuilt encrypted imports `<source>!<output Battle.net ID>_YYYY-MM-DD_HH-mm.txt`, with a browser-local timestamp that is Windows-safe (`:` is not used).
+- Add Windows filename sanitisation, Content-Disposition filename handling (including Unicode), and fallback naming for pasted payloads/older files. The native encrypted content is unchanged.
+- Bump UI, API, assets, tests, version file and release instructions to v2.0.3. Account-key fingerprint remains informational only.
+
+
 ## v2.0.2 — 2026-11-02
 
 - Fix the stale `test_wrong_account_rejected` assertion after restoring the intentional non-enforcement of legacy account-key fingerprints. A different output encryption ID is accepted and the generated payload decrypts under that ID.

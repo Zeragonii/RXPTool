@@ -18,11 +18,14 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from rxp_decrypt import (DecodeError, decode_chunk, derive_base, extract_chunks,
                          guide_label, initial_permutation)
 from webapp.editable_document import (DocumentError, is_editable_document,
-                                      make_editable_document, rebuild_from_editable_document)
+                                      make_editable_document, rebuild_from_editable_document,
+                                      source_name_from_editable_document)
+from webapp.download_names import (source_stem, editable_filename, encrypted_filename,
+                                   content_disposition)
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC = BASE_DIR / 'static'
-VERSION = '2.0.2'
+VERSION = '2.0.3'
 MAX_REQUEST_BYTES = 32 * 1024 * 1024
 MAX_DOCUMENT_BYTES = 16 * 1024 * 1024
 MAX_PLAINTEXT_BYTES = 128 * 1024 * 1024
@@ -116,9 +119,9 @@ async def favicon():
 
 
 ASSETS = {
-    'app-v2.0.2.css': ('app.css', 'text/css'),
-    'app-v2.0.2.js': ('app.js', 'application/javascript'),
-    'encrypt-v2.0.2.js': ('encrypt.js', 'application/javascript'),
+    'app-v2.0.3.css': ('app.css', 'text/css'),
+    'app-v2.0.3.js': ('app.js', 'application/javascript'),
+    'encrypt-v2.0.3.js': ('encrypt.js', 'application/javascript'),
     'favicon.svg': ('favicon.svg', 'image/svg+xml'),
     'favicon-32.png': ('favicon-32.png', 'image/png'),
     'apple-touch-icon.png': ('apple-touch-icon.png', 'image/png'),
@@ -174,10 +177,10 @@ def valid_account_id(value: Any) -> bool:
     return isinstance(value, str) and 1 <= len(value.strip().encode('utf-8')) <= 256
 
 
-def decrypt_operation(account_id: str, payload: str):
+def decrypt_operation(account_id: str, payload: str, stem: str | None):
     try:
         guides, chunk_count = decode_payload(account_id, payload)
-        editable, count, actual_chunks = make_editable_document(payload, account_id)
+        editable, count, actual_chunks = make_editable_document(payload, account_id, source_name=stem)
         if count != len(guides) or actual_chunks != chunk_count:
             raise DocumentError('Guide count mismatch while creating editable document')
         names = [guide_label(guide, n) for n, guide in enumerate(guides[:10], 1)]
@@ -198,6 +201,10 @@ async def decrypt(request: Request):
     if not isinstance(body, dict):
         return failure(400, 'Expected a JSON object')
     account, payload = body.get('battle_id'), body.get('payload')
+    source_filename = body.get('source_filename')
+    if source_filename is not None and (not isinstance(source_filename, str) or len(source_filename) > 4096):
+        return failure(400, 'Invalid source filename')
+    stem = source_stem(source_filename) if source_filename else None
     if body.get('format', 'editable') != 'editable':
         return failure(400, 'Only Editable guide TXT export is supported')
     if not valid_account_id(account):
@@ -208,25 +215,31 @@ async def decrypt(request: Request):
         return failure(429, 'Decoder is busy; retry shortly')
     try:
         output, count, chunks, preview = await run_in_threadpool(
-            decrypt_operation, account.strip(), payload)
+            decrypt_operation, account.strip(), payload, stem)
     except (DecodeError, DocumentError) as exc:
         return failure(422, str(exc))
     except Exception:
         return failure(500, 'Unexpected server error while decrypting payload')
     return Response(content=output, media_type='text/plain; charset=utf-8', headers={
-        'Content-Disposition': 'attachment; filename="editable_guides.txt"',
+        'Content-Disposition': content_disposition(editable_filename(stem or 'editable_guides')),
         'X-Guide-Count': str(count), 'X-Chunk-Count': str(chunks),
         'X-Guide-Preview': preview, 'X-Output-Format': 'editable',
     })
 
 
-def parse_editable_upload(body: Any) -> tuple[str, bytes]:
+def parse_editable_upload(body: Any) -> tuple[str, bytes, str | None, str | None]:
     if not isinstance(body, dict):
         raise DocumentError('Expected a JSON object')
     account = body.get('battle_id')
     encoded = body.get('content_base64')
+    input_filename = body.get('filename')
+    timestamp = body.get('download_timestamp')
+    if input_filename is not None and (not isinstance(input_filename, str) or len(input_filename) > 4096):
+        raise DocumentError('Invalid editable TXT filename')
+    if timestamp is not None and (not isinstance(timestamp, str) or len(timestamp) > 50):
+        raise DocumentError('Invalid download timestamp')
     if not valid_account_id(account):
-        raise DocumentError('Enter the original matching Battle.net ID')
+        raise DocumentError('Enter the Battle.net ID for output encryption')
     if not isinstance(encoded, str) or not encoded:
         raise DocumentError('Upload an editable_guides.txt file')
     if len(encoded) > ((MAX_DOCUMENT_BYTES + 2) // 3 * 4 + 16):
@@ -239,7 +252,7 @@ def parse_editable_upload(body: Any) -> tuple[str, bytes]:
         raise DocumentError('Editable TXT must be between 1 byte and 16 MiB')
     if not is_editable_document(data):
         raise DocumentError('Only #!RXPTOOL/1 Editable guide TXT is supported')
-    return account.strip(), data
+    return account.strip(), data, input_filename, timestamp
 
 
 def encrypt_operation(account: str, document: bytes):
@@ -263,7 +276,7 @@ async def encrypt(request: Request):
     if request.headers.get('content-type', '').split(';', 1)[0].strip().lower() != 'application/json':
         return failure(415, 'Expected application/json')
     try:
-        account, document = parse_editable_upload(await bounded_json(request))
+        account, document, input_filename, timestamp = parse_editable_upload(await bounded_json(request))
     except (DecodeError, DocumentError) as exc:
         return failure(413 if 'too large' in str(exc).lower() else 400, str(exc))
     if not slots.acquire(blocking=False):
@@ -274,8 +287,13 @@ async def encrypt(request: Request):
         return failure(422, str(exc))
     except Exception:
         return failure(500, 'Unexpected server error while encrypting guides')
+    try:
+        source = source_name_from_editable_document(document) or source_stem(input_filename)
+        download_name = encrypted_filename(source, account, timestamp)
+    except DocumentError as exc:
+        return failure(422, str(exc))
     return Response(content=output, media_type='text/plain; charset=utf-8', headers={
-        'Content-Disposition': 'attachment; filename="rebuilt_import.txt"',
+        'Content-Disposition': content_disposition(download_name),
         'X-Guide-Count': str(count), 'X-Chunk-Count': str(chunks),
         'X-Import-Rebuilt': 'true', 'X-Package-Verified': 'true',
     })

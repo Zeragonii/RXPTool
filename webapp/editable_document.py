@@ -13,6 +13,7 @@ import re
 import zlib
 
 from rxp_decrypt import CHUNK_RE, decode_chunk, derive_base, extract_chunks, initial_permutation, xor_stream
+from webapp.download_names import safe_component
 
 MAGIC = b'#!RXPTOOL/1\n'
 
@@ -68,7 +69,7 @@ def _json_line(label: bytes, value: object) -> bytes:
     return label + json.dumps(value, ensure_ascii=True, separators=(',', ':')).encode('ascii') + b'\n'
 
 
-def make_editable_document(payload: str, account_id: str, max_plaintext_bytes: int = MAX_DOCUMENT_BYTES) -> tuple[bytes, int, int]:
+def make_editable_document(payload: str, account_id: str, max_plaintext_bytes: int = MAX_DOCUMENT_BYTES, *, source_name: str | None = None) -> tuple[bytes, int, int]:
     """Decode every *raw* chunk, preserving leading, trailing & repeated NUL slots."""
     framing = original_framing(payload)
     if framing['input_kind'] != 'framed-import':
@@ -85,6 +86,8 @@ def make_editable_document(payload: str, account_id: str, max_plaintext_bytes: i
            _json_line(b'#!header=', head),
            _json_line(b'#!footer=', foot),
            _json_line(b'#!account_key_fingerprint=', hashlib.sha256(derive_base(account_id)).hexdigest())]
+    if source_name is not None:
+        out.append(_json_line(b'#!source_name=', safe_component(source_name, 'editable_guides', 120)))
     total = 0
     count = 0
     for idx, chunk in enumerate(chunks):
@@ -150,6 +153,11 @@ def rebuild_from_editable_document(document: bytes, account_id: str) -> tuple[st
     # validate or enforce its value. The ID supplied here is only used to
     # generate the requested output encryption key.
     read_setting(b'#!account_key_fingerprint=')
+    next_line, _ = _line(document, pos)
+    if next_line.startswith(b'#!source_name='):
+        source_name = read_setting(b'#!source_name=')
+        if not isinstance(source_name, str) or not source_name.strip() or len(source_name.encode('utf-8')) > 120:
+            raise DocumentError('Invalid #!source_name value')
     if not isinstance(header, str) or not re.fullmatch(r'\D*\d+\|', header) or not isinstance(footer, str) or not re.fullmatch(r'\|\d+\D*', footer):
         raise DocumentError('The stored import header/footer is not valid')
     between = []
@@ -241,3 +249,22 @@ def rebuild_from_editable_document(document: bytes, account_id: str) -> tuple[st
     if len(result.encode('utf-8')) > MAX_OUTPUT_BYTES or len(CHUNK_RE.findall(result)) != len(chunks):
         raise DocumentError('Rebuilt native import exceeds limits or has ambiguous framing')
     return result, guide_count, len(chunks), raw_chunks
+
+
+def source_name_from_editable_document(document: bytes) -> str | None:
+    """Optional v2.0.3 title, compatible with pre-2.0.3 editable files."""
+    if not is_editable_document(document):
+        return None
+    pos = 3 if document.startswith(b'\xef\xbb\xbf') else 0
+    for _ in range(4):  # magic, header, footer, legacy fingerprint
+        _, pos = _line(document, pos)
+    line, _ = _line(document, pos)
+    if not line.startswith(b'#!source_name='):
+        return None
+    try:
+        value = json.loads(line[len(b'#!source_name='):].decode('ascii'))
+    except (ValueError, UnicodeError) as exc:
+        raise DocumentError('Invalid #!source_name value') from exc
+    if not isinstance(value, str) or not value.strip() or len(value.encode('utf-8')) > 120:
+        raise DocumentError('Invalid #!source_name value')
+    return value
