@@ -6,3 +6,9 @@ button.secondary{background:#344969;color:#eaf1fc;white-space:nowrap}
 .login-card button{width:100%}
 .login-card input:focus{outline:2px solid #80b4ff;outline-offset:2px}
 @media(max-width:550px){.topbar{display:block}.topbar button{margin-top:0}}
+
+textarea{width:100%;background:#091427;color:white;border:1px solid #51617f;border-radius:8px;padding:14px;font:inherit;resize:vertical;min-height:110px}
+.public-preview{margin-top:22px;padding:18px 20px;background:#0b192e;border:1px solid #354c6d;border-radius:11px}
+.public-preview h3{font-size:1.3rem;margin:12px 0 8px;overflow-wrap:anywhere}
+.public-preview p{white-space:pre-line;overflow-wrap:anywhere;margin:8px 0}
+.public-message{white-space:pre-line;overflow-wrap:anywhere}
