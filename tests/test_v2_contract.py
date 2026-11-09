@@ -162,7 +162,7 @@ def test_removed_modules_not_shipped():
     root = Path(__file__).resolve().parents[1]
     for name in ['import_bundle','manifest_rebuild','package_crypto','native_encrypt']:
         assert not (root / 'webapp' / (name + '.py')).exists()
-    assert (root / 'VERSION').read_text().strip() == '2.0.3'
+    assert (root / 'VERSION').read_text().strip() == '2.1.0'
 
 
 def test_decrypt_preserves_uploaded_stem_and_encrypt_names_import():
