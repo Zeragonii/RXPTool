@@ -151,9 +151,9 @@ def validate_public_page_settings(data: dict) -> dict[str, str]:
         value = value.strip()
         if not value or len(value) > limit:
             raise ValueError(f"{field} must contain 1-{limit} characters")
-        if any(ord(char) < 32 and char not in "\\n\\r\\t" for char in value):
+        if any(ord(char) < 32 and char not in (chr(10), chr(13), chr(9)) for char in value):
             raise ValueError(f"{field} contains unsupported control characters")
-        if field == "headline" and any(char in "\\n\\r" for char in value):
+        if field == "headline" and any(char in (chr(10), chr(13)) for char in value):
             raise ValueError("headline must be a single line")
         values[field] = value
     return values
