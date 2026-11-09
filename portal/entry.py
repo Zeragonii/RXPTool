@@ -6,6 +6,7 @@ webapp.main here: its decrypt/encrypt endpoints must not exist on public mode.
 from __future__ import annotations
 
 import hashlib
+import html
 import hmac
 import json
 import logging
@@ -36,6 +37,11 @@ if ROLE not in {"admin", "public"}:
 DB = Path(os.environ.get("RXP_PORTAL_DB", "/data/portal.sqlite3"))
 MAX_GUIDE = 16 * 1024 * 1024
 MAX_OUTPUT = 24 * 1024 * 1024
+PUBLIC_HEADLINE_DEFAULT = "Your guide, ready to import."
+PUBLIC_MESSAGE_DEFAULT = ("Enter a whitelisted Battle.net ID to generate an "
+                          "account-specific encrypted import of the latest published guide.")
+MAX_HEADLINE = 160
+MAX_MESSAGE = 1000
 ADMIN_USER = os.environ.get("RXP_PORTAL_ADMIN_USER", "")
 ADMIN_PASSWORD = os.environ.get("RXP_PORTAL_ADMIN_PASSWORD", "")
 COOKIE_SECURE = os.environ.get("RXP_PORTAL_COOKIE_SECURE", "false").lower() in {"1", "true", "yes"}
@@ -100,6 +106,9 @@ def initialize():
             title TEXT NOT NULL, sha256 TEXT NOT NULL,
             guides INTEGER NOT NULL, chunks INTEGER NOT NULL, published_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS page_settings (
+            name TEXT PRIMARY KEY, value TEXT NOT NULL
+        );
         """)
 
 
@@ -118,10 +127,54 @@ def metadata() -> dict | None:
         return dict(item) if item else None
 
 
+def get_public_page_settings() -> dict[str, str]:
+    """Get the latest saved public text on every request (no restart needed)."""
+    settings = {
+        "headline": PUBLIC_HEADLINE_DEFAULT,
+        "message": PUBLIC_MESSAGE_DEFAULT,
+    }
+    with dbconnect() as db:
+        rows = db.execute(
+            "SELECT name, value FROM page_settings WHERE name IN ('headline', 'message')"
+        ).fetchall()
+    for row in rows:
+        settings[row["name"]] = row["value"]
+    return settings
+
+
+def validate_public_page_settings(data: dict) -> dict[str, str]:
+    values = {}
+    for field, limit in (("headline", MAX_HEADLINE), ("message", MAX_MESSAGE)):
+        value = data.get(field)
+        if not isinstance(value, str):
+            raise ValueError(f"{field} must be text")
+        value = value.strip()
+        if not value or len(value) > limit:
+            raise ValueError(f"{field} must contain 1-{limit} characters")
+        if any(ord(char) < 32 and char not in (chr(10), chr(13), chr(9)) for char in value):
+            raise ValueError(f"{field} contains unsupported control characters")
+        if field == "headline" and any(char in (chr(10), chr(13)) for char in value):
+            raise ValueError("headline must be a single line")
+        values[field] = value
+    return values
+
+
+def save_public_page_settings(data: dict) -> dict[str, str]:
+    values = validate_public_page_settings(data)
+    with dbconnect() as db:
+        db.executemany(
+            "INSERT INTO page_settings (name, value) VALUES (?, ?) "
+            "ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+            list(values.items()),
+        )
+    return values
+
+
 def state() -> dict:
     with dbconnect() as db:
         return {
             "current": metadata(),
+            "public_page": get_public_page_settings(),
             "allowlist": [row[0] for row in db.execute(
                 "SELECT battle_id FROM approved ORDER BY battle_id COLLATE NOCASE"
             )],
@@ -226,11 +279,11 @@ async def body_bytes(request: Request, maxlen: int):
     return bytes(result)
 
 
-async def body_json(request: Request) -> dict:
+async def body_json(request: Request, maxlen: int = 2048) -> dict:
     if request.headers.get("content-type", "").split(";", 1)[0].lower() != "application/json":
         raise ValueError("Expected application/json")
     try:
-        obj = json.loads(await body_bytes(request, 2048))
+        obj = json.loads(await body_bytes(request, maxlen))
     except (UnicodeError, json.JSONDecodeError):
         raise ValueError("Invalid JSON") from None
     if not isinstance(obj, dict):
@@ -335,7 +388,13 @@ def health():
 @app.get("/")
 @app.get("/download" if ROLE == "public" else "/admin/publish")
 def home():
-    return FileResponse(STATIC / ("download.html" if ROLE == "public" else "admin.html"), media_type="text/html")
+    if ROLE == "admin":
+        return FileResponse(STATIC / "admin.html", media_type="text/html")
+    values = get_public_page_settings()
+    template = (STATIC / "download.html").read_text(encoding="utf-8")
+    content = (template.replace("{{PUBLIC_HEADLINE}}", html.escape(values["headline"], quote=True))
+                       .replace("{{PUBLIC_MESSAGE}}", html.escape(values["message"], quote=True)))
+    return Response(content, media_type="text/html; charset=utf-8")
 
 
 @app.get("/assets/style.css")
@@ -389,9 +448,23 @@ if ROLE == "admin":
     def admin_script():
         return FileResponse(STATIC / "admin.js", media_type="application/javascript")
 
+    @app.get("/assets/settings.js")
+    def settings_script():
+        return FileResponse(STATIC / "settings.js", media_type="application/javascript")
+
     @app.get("/api/state")
     def admin_state():
         return state()
+
+    @app.post("/api/settings/public-page")
+    async def update_public_page(request: Request):
+        if not limit("admin-settings:" + (request.client.host if request.client else "unknown"), 30):
+            return error(429, "Too many settings updates")
+        try:
+            values = save_public_page_settings(await body_json(request, maxlen=16384))
+            return {"public_page": values}
+        except ValueError as exc:
+            return error(400, str(exc))
 
     @app.post("/api/allowlist/add")
     @app.post("/api/allowlist/remove")

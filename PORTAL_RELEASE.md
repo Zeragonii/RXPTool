@@ -45,3 +45,14 @@ git push
 git tag v2.1.0
 git push origin v2.1.0
 ```
+
+## Editing the public page text
+
+From the **private publisher** at `/admin/publish`, find the **Public downloads page** section. Edit the headline and message, review the live preview, and click **Save public page text**.
+
+- Changes become visible to public visitors when they next refresh `/download`. **No new guide publication, environment variables or container restart required.**
+- The settings are stored in the existing `rxptool_portal_data` SQLite volume, separate from published guide versions and allowlist entries. Container redeployments preserve the values.
+- The default text is exactly the original RXPTool download page headline and description; existing installations gain these settings automatically when the admin container starts.
+- Headline accepts 1–160 characters on one line. Message accepts 1–1000 characters and line breaks.
+- These fields accept *plain text only*, with HTML escaped when the public page is rendered. They cannot inject scripts, links or HTML markup.
+- Changing these values affects **only the public downloads page**. The admin login, original Decrypt and Encrypt screens, guide contents, and public-download security restrictions are unchanged.
