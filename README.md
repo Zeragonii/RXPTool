@@ -4,7 +4,7 @@ Self-hosted, account-keyed RestedXP import editor and controlled public guide do
 
 ## New in v2.1.0
 
-A private session-login guide publishing dashboard and a standalone public download portal can be deployed as two additional services from the same GHCR image. Public users enter an approved Battle.net ID and receive the latest guide encrypted for that account. The existing editor routes remain private. The publisher can also edit the public page's headline and message live, with changes stored in the existing volume. See [PORTAL_RELEASE.md](PORTAL_RELEASE.md) for Portainer deployment and security details.
+A private session-login guide publishing dashboard and a standalone public download portal can be deployed as two additional services from the same GHCR image. Public users enter an approved Battle.net ID and receive the latest guide encrypted for that account. The existing editor routes remain private. The publisher can also edit the public page's headline and message live, with changes stored in the existing volume. The public downloader now uses an original Bloodsail-inspired crimson, gold and parchment pirate design (admin and editor styling unchanged). See [PORTAL_RELEASE.md](PORTAL_RELEASE.md) for Portainer deployment and security details.
 
 ## Workflow
 
