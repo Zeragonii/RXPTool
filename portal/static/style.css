@@ -239,6 +239,7 @@ body.public-download-page::before {
   border-color: #dfba7e;
 }
 .public-download-page .public-form button {
+  position: relative;
   width: 100%;
   display: flex;
   align-items: center;
@@ -266,7 +267,7 @@ body.public-download-page::before {
 .public-download-page .public-form button:focus-visible { outline: 2px solid #f1ddab; outline-offset: 3px; }
 .public-download-page .public-form button:active:not(:disabled) { transform: translateY(1px); }
 .public-download-page .public-form button:disabled { opacity: .7; cursor: progress; }
-.public-button-tail { position: absolute; right: max(34px, calc((100% - 475px) / 2 + 19px)); font-size: 1.5rem; font-weight: 400; }
+.public-button-tail { position: absolute; right: 18px; font-size: 1.5rem; font-weight: 400; }
 .public-download-page .public-form .status {
   margin: 11px 0 0;
   color: #e6c18b;
@@ -300,13 +301,11 @@ body.public-download-page::before {
   .public-flag { font-size: .51rem; letter-spacing: .11em; }
   .public-deck { padding: 25px 24px 23px; }
   .public-crest { width: 127px; height: 127px; margin-bottom: 2px; }
-  .public-button-tail { right: 41px; }
 }
 @media(max-width:380px) {
   .public-flag { display: none; }
   .public-deck { padding-left: 18px; padding-right: 18px; }
   .public-eyebrow { font-size: .59rem; letter-spacing: .16em; }
-  .public-button-tail { right: 29px; }
 }
 @media(prefers-reduced-motion:reduce) {
   .public-download-page .public-form button { transition: none; }
