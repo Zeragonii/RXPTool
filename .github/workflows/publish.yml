@@ -43,6 +43,7 @@ jobs:
           node --check webapp/static/encrypt.js
           node --check portal/static/admin.js
           node --check portal/static/download.js
+          node --check portal/static/login.js
       - name: Run API and decryption tests
         run: python -m pytest -q
       - name: Check release tag matches VERSION
