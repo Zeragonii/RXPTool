@@ -145,3 +145,63 @@ def test_admin_session_restarts_and_public_auth_isolation(tmp_path, monkeypatch)
         for url in ("/login", "/assets/login.js", "/api/login", "/api/logout"):
             assert client.get(url).status_code == 404
         assert client.post("/api/login", json={}).status_code == 404
+
+
+def test_public_page_settings_persist_update_live_and_escape_html(tmp_path, monkeypatch):
+    admin = load("admin", tmp_path, monkeypatch)
+    with TestClient(admin.app) as c:
+        defaults = c.get("/api/state")
+        assert defaults.status_code == 401
+        headers = sign_in(c)
+        state = c.get("/api/state").json()
+        assert state["public_page"]["headline"] == "Your guide, ready to import."
+        assert state["public_page"]["message"].startswith("Enter a whitelisted Battle.net ID")
+
+        original_version = state["current"]
+        endpoint = "/api/settings/public-page"
+        payload = {"headline": '<img src=x onerror=alert(1)>',
+                   "message": 'New line one\n<script>alert(1)</script> & more'}
+        assert c.post(endpoint, json=payload).status_code == 403
+        assert c.post(endpoint, json=payload, headers={"X-RXP-Admin": "1",
+                          "Origin": "https://evil.example"}).status_code == 403
+        assert c.post(endpoint, json={"headline": "", "message": "Hello"},
+                      headers=headers).status_code == 400
+        assert c.post(endpoint, json={"headline": "X" * 161, "message": "Hello"},
+                      headers=headers).status_code == 400
+        assert c.post(endpoint, json={"headline": "Line\nTwo", "message": "Hello"},
+                      headers=headers).status_code == 400
+        assert c.post(endpoint, json={"headline": "Valid", "message": "Y" * 1001},
+                      headers=headers).status_code == 400
+        assert c.post(endpoint, json=payload, headers=headers).status_code == 200
+        new_state = c.get("/api/state").json()
+        assert new_state["public_page"] == payload
+        assert new_state["current"] == original_version
+
+    public = load("public", tmp_path, monkeypatch)
+    with TestClient(public.app) as c:
+        response = c.get("/download")
+        assert response.status_code == 200
+        assert "&lt;img src=x onerror=alert(1)&gt;" in response.text
+        assert "<img src=x onerror=alert(1)>" not in response.text
+        assert "&lt;script&gt;alert(1)&lt;/script&gt; &amp; more" in response.text
+        assert "New line one\n" in response.text
+        assert c.get("/assets/settings.js").status_code == 404
+        assert c.get("/api/settings/public-page").status_code == 404
+        assert c.post("/api/settings/public-page", json=payload).status_code == 404
+
+        # The PUBLIC container is already running while a separate publisher
+        # updates SQLite. A new GET sees changes without any restarts.
+        with sqlite3.connect(tmp_path / "data.db") as db:
+            db.execute("UPDATE page_settings SET value=? WHERE name='headline'",
+                       ("Changed live",))
+        updated = c.get("/download")
+        assert "Changed live" in updated.text
+        assert "&lt;img" not in updated.text
+
+    # A fresh admin process still sees the same persisted site text.
+    admin = load("admin", tmp_path, monkeypatch)
+    with TestClient(admin.app) as c:
+        sign_in(c)
+        persisted = c.get("/api/state").json()["public_page"]
+        assert persisted["headline"] == "Changed live"
+        assert persisted["message"] == payload["message"]
