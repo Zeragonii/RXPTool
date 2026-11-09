@@ -4,7 +4,7 @@ Self-hosted, account-keyed RestedXP import editor and controlled public guide do
 
 ## New in v2.1.0
 
-A private guide publishing dashboard and a standalone public download portal can be deployed as two additional services from the same GHCR image. Public users enter an approved Battle.net ID and receive the latest guide encrypted for that account. The existing editor routes remain private. See [PORTAL_RELEASE.md](PORTAL_RELEASE.md) for Portainer deployment and security details.
+A private session-login guide publishing dashboard and a standalone public download portal can be deployed as two additional services from the same GHCR image. Public users enter an approved Battle.net ID and receive the latest guide encrypted for that account. The existing editor routes remain private. See [PORTAL_RELEASE.md](PORTAL_RELEASE.md) for Portainer deployment and security details.
 
 ## Workflow
 
