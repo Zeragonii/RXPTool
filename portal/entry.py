@@ -448,6 +448,10 @@ if ROLE == "admin":
     def admin_script():
         return FileResponse(STATIC / "admin.js", media_type="application/javascript")
 
+    @app.get("/assets/settings.js")
+    def settings_script():
+        return FileResponse(STATIC / "settings.js", media_type="application/javascript")
+
     @app.get("/api/state")
     def admin_state():
         return state()
