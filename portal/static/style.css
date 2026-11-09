@@ -12,3 +12,303 @@ textarea{width:100%;background:#091427;color:white;border:1px solid #51617f;bord
 .public-preview h3{font-size:1.3rem;margin:12px 0 8px;overflow-wrap:anywhere}
 .public-preview p{white-space:pre-line;overflow-wrap:anywhere;margin:8px 0}
 .public-message{white-space:pre-line;overflow-wrap:anywhere}
+
+
+/* ─────────────────────────────────────────────────────────
+   RXPTool · Privateer's Cache
+   Original Bloodsail-inspired maritime artwork and UI.
+   Scoped to the public downloader; admin and login unchanged.
+   ───────────────────────────────────────────────────────── */
+body.public-download-page {
+  --sail-red: #ab2e39;
+  --sail-darkred: #5c1520;
+  --sail-gold: #c9a36a;
+  --sail-parchment: #f1dfbd;
+  --sail-muted: #b9a78e;
+  --sail-border: rgba(197, 149, 91, .39);
+  margin: 0;
+  color: var(--sail-parchment);
+  background:
+    radial-gradient(ellipse at 50% -18%, rgba(139, 37, 43, .43), transparent 52%),
+    radial-gradient(ellipse at 110% 80%, rgba(84, 29, 34, .23), transparent 42%),
+    repeating-linear-gradient(130deg, transparent 0, transparent 95px, rgba(220, 165, 90, .017) 96px),
+    #110e14;
+  min-height: 100vh;
+  font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+}
+body.public-download-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: .24;
+  background: repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgba(2, 1, 2, .19) 4px);
+}
+.public-download-page .public-shell {
+  max-width: 680px;
+  padding: 26px 22px 32px;
+  margin: 0 auto;
+  position: relative;
+}
+.public-masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 3px 4px 21px;
+}
+.public-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #f0e1c6;
+  font-size: 1.13rem;
+  font-weight: 800;
+  letter-spacing: -.055em;
+}
+.public-brand-emphasis { color: var(--sail-gold); }
+.brand-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  border: 1px solid #ae874f;
+  transform: rotate(45deg);
+  border-radius: 4px;
+  color: #f0c785;
+  font-size: 1.05rem;
+  box-shadow: 0 0 15px rgba(183, 94, 67, .19);
+}
+.public-brand .brand-mark { line-height: 1; }
+.public-flag {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  white-space: nowrap;
+  font-size: .64rem;
+  letter-spacing: .19em;
+  font-weight: 750;
+  color: #d7bf96;
+}
+.public-flag-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  background: var(--sail-red);
+  border: 1px solid #dcb184;
+  transform: rotate(45deg);
+}
+.public-deck {
+  isolation: isolate;
+  position: relative;
+  overflow: hidden;
+  padding: 31px clamp(21px, 5.5vw, 51px) 28px;
+  text-align: center;
+  background:
+    radial-gradient(ellipse at 50% 0, rgba(105, 31, 38, .31), transparent 55%),
+    linear-gradient(146deg, #271b22 0%, #1b151b 50%, #15131a 100%);
+  border: 1px solid #ad8150;
+  border-radius: 11px;
+  box-shadow:
+    0 35px 95px rgba(0, 0, 0, .54),
+    inset 0 0 0 5px rgba(17, 13, 16, .8),
+    inset 0 0 0 6px rgba(187, 140, 78, .18);
+}
+.public-deck::before,
+.public-deck::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+}
+.public-deck::before {
+  inset: 0;
+  opacity: .23;
+  background: repeating-linear-gradient(150deg, transparent 0, transparent 20px, rgba(216, 170, 107, .034) 21px, transparent 22px);
+}
+.public-deck::after {
+  width: 360px;
+  height: 360px;
+  top: -170px;
+  left: calc(50% - 180px);
+  border-radius: 50%;
+  background: rgba(160, 44, 54, .14);
+  filter: blur(70px);
+}
+.deck-corner {
+  position: absolute;
+  width: 31px;
+  height: 31px;
+  z-index: 1;
+  pointer-events: none;
+}
+.deck-corner-tl { top: 10px; left: 10px; border-top: 2px solid #c5a06a; border-left: 2px solid #c5a06a; }
+.deck-corner-tr { top: 10px; right: 10px; border-top: 2px solid #c5a06a; border-right: 2px solid #c5a06a; }
+.deck-corner-bl { bottom: 10px; left: 10px; border-bottom: 2px solid #c5a06a; border-left: 2px solid #c5a06a; }
+.deck-corner-br { bottom: 10px; right: 10px; border-bottom: 2px solid #c5a06a; border-right: 2px solid #c5a06a; }
+.public-crest {
+  display: grid;
+  place-items: center;
+  width: 150px;
+  height: 150px;
+  margin: 0 auto 8px;
+  filter: drop-shadow(0 12px 13px rgba(0, 0, 0, .48));
+}
+.public-crest svg { display: block; width: 100%; height: 100%; }
+.public-eyebrow {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 13px;
+  font-size: .68rem;
+  letter-spacing: .26em;
+  color: #d3a568;
+  font-weight: 800;
+  margin: 11px 0 14px;
+}
+.public-eyebrow span { font-size: .53rem; color: #a3373d; }
+.public-download-page h1 {
+  margin: 0 auto 13px;
+  max-width: 540px;
+  color: #f8e6c4;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(2rem, 5.5vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -.045em;
+  line-height: 1.12;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  text-shadow: 0 3px 20px rgba(4, 2, 4, .45);
+}
+.public-download-page .public-message {
+  margin: 0 auto;
+  max-width: 510px;
+  color: #cbbba3;
+  font-size: 1rem;
+  line-height: 1.72;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.public-divider {
+  display: flex;
+  gap: 13px;
+  align-items: center;
+  justify-content: center;
+  margin: 23px 0;
+  color: #b78b55;
+}
+.public-divider span { height: 1px; width: min(100%, 140px); background: linear-gradient(90deg, transparent, #79603e); }
+.public-divider span:last-child { transform: rotate(180deg); }
+.public-divider b { font-size: .65rem; }
+.public-form { margin: 0 auto; max-width: 475px; text-align: left; }
+.public-download-page .public-form label {
+  display: block;
+  margin: 0 0 10px;
+  color: #dec59f;
+  font-size: .7rem;
+  letter-spacing: .16em;
+  font-weight: 800;
+}
+.public-input-wrap { position: relative; }
+.public-input-symbol {
+  position: absolute;
+  inset: 0 auto 0 17px;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  color: #bf985f;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+.public-download-page .public-form input {
+  display: block;
+  width: 100%;
+  height: 53px;
+  padding: 12px 17px 12px 45px;
+  border-radius: 5px;
+  border: 1px solid rgba(191, 146, 89, .62);
+  background: rgba(11, 12, 18, .75);
+  color: #fbebce;
+  font-size: 1rem;
+  box-shadow: inset 0 1px 7px rgba(0,0,0,.37), 0 1px 0 rgba(255, 236, 196, .035);
+}
+.public-download-page .public-form input::placeholder { color: #81776e; }
+.public-download-page .public-form input:focus-visible {
+  outline: 2px solid #e6c18b;
+  outline-offset: 3px;
+  border-color: #dfba7e;
+}
+.public-download-page .public-form button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  min-height: 53px;
+  padding: 13px 20px;
+  margin-top: 13px;
+  border-radius: 5px;
+  border: 1px solid #d7ab71;
+  color: #ffe9c4;
+  background: linear-gradient(180deg, #a8303b 0%, #821d2c 54%, #671521 100%);
+  font-size: .83rem;
+  letter-spacing: .135em;
+  font-weight: 800;
+  text-shadow: 0 1px 2px #3b101a;
+  box-shadow: inset 0 1px rgba(255, 228, 190, .26), 0 7px 23px rgba(54, 6, 12, .31);
+  transition: filter .14s ease, transform .14s ease, box-shadow .14s ease;
+}
+.public-download-page .public-form button:hover:not(:disabled) {
+  filter: brightness(1.16);
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px rgba(255, 228, 190, .34), 0 10px 27px rgba(54, 6, 12, .5);
+}
+.public-download-page .public-form button:focus-visible { outline: 2px solid #f1ddab; outline-offset: 3px; }
+.public-download-page .public-form button:active:not(:disabled) { transform: translateY(1px); }
+.public-download-page .public-form button:disabled { opacity: .7; cursor: progress; }
+.public-button-tail { position: absolute; right: max(34px, calc((100% - 475px) / 2 + 19px)); font-size: 1.5rem; font-weight: 400; }
+.public-download-page .public-form .status {
+  margin: 11px 0 0;
+  color: #e6c18b;
+  min-height: 1.5em;
+  text-align: center;
+  font-size: .92rem;
+}
+.public-download-page .public-form .status.error { color: #ffb3b3; }
+.public-seal {
+  display: flex;
+  align-items: center;
+  text-align: left;
+  max-width: 475px;
+  gap: 14px;
+  padding: 16px 17px;
+  margin: 18px auto 0;
+  border: 1px solid rgba(204, 161, 106, .22);
+  border-radius: 5px;
+  background: rgba(7, 9, 14, .42);
+}
+.public-seal-icon { color: #cfab75; font-size: 1.45rem; }
+.public-seal p { display: grid; gap: 5px; margin: 0; color: #ab9e8c; font-size: .78rem; line-height: 1.55; }
+.public-seal strong { color: #d7b787; font-size: .65rem; letter-spacing: .15em; }
+.public-footer { margin-top: 25px; text-align: center; }
+.public-footer-line { color: #93714b; letter-spacing: .18em; font-weight: 700; font-size: .66rem; }
+.public-footer-line span { color: #6e3c37; margin: 0 12px; }
+.public-download-page .public-footer p { color: #847d79; margin-top: 8px; font-size: .74rem; line-height: 1.6; }
+@media(max-width:600px) {
+  .public-download-page .public-shell { padding: 18px 12px 30px; }
+  .public-masthead { padding: 4px 10px 17px; }
+  .public-flag { font-size: .51rem; letter-spacing: .11em; }
+  .public-deck { padding: 25px 24px 23px; }
+  .public-crest { width: 127px; height: 127px; margin-bottom: 2px; }
+  .public-button-tail { right: 41px; }
+}
+@media(max-width:380px) {
+  .public-flag { display: none; }
+  .public-deck { padding-left: 18px; padding-right: 18px; }
+  .public-eyebrow { font-size: .59rem; letter-spacing: .16em; }
+  .public-button-tail { right: 29px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .public-download-page .public-form button { transition: none; }
+  .public-download-page .public-form button:hover { transform: none; }
+}
