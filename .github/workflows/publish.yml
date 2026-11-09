@@ -36,11 +36,13 @@ jobs:
       - name: Install test dependencies
         run: python -m pip install -r requirements-dev.txt
       - name: Compile application
-        run: python -m compileall -q rxp_decrypt.py webapp
+        run: python -m compileall -q rxp_decrypt.py webapp portal
       - name: Check frontend JavaScript syntax
         run: |
           node --check webapp/static/app.js
           node --check webapp/static/encrypt.js
+          node --check portal/static/admin.js
+          node --check portal/static/download.js
       - name: Run API and decryption tests
         run: python -m pytest -q
       - name: Check release tag matches VERSION

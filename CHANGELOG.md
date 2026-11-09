@@ -1,3 +1,10 @@
+## v2.1.0
+
+- Add isolated private publication dashboard and public allowlisted, account-keyed downloads.
+- Preserve both original editor pages and their API routes.
+- Use the existing encrypted native import encoder with full roundtrip verification before publishing and downloading.
+- Add persistent guide and allowlist storage, rollback history, request limits, and separate role-based Portainer services.
+
 # Changelog
 
 ## v2.0.3 — 2026-11-04
