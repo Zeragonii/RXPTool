@@ -1,6 +1,10 @@
-# RXPTool v2.0.3
+# RXPTool v2.1.0
 
-Self-hosted, account-keyed RestedXP import editor. **One document format, two screens.**
+Self-hosted, account-keyed RestedXP import editor and controlled public guide downloader. **The original two-screen editor remains unchanged.**
+
+## New in v2.1.0
+
+A private guide publishing dashboard and a standalone public download portal can be deployed as two additional services from the same GHCR image. Public users enter an approved Battle.net ID and receive the latest guide encrypted for that account. The existing editor routes remain private. See [PORTAL_RELEASE.md](PORTAL_RELEASE.md) for Portainer deployment and security details.
 
 ## Workflow
 
@@ -61,7 +65,7 @@ docker compose up --build -d
 python rxp_decrypt.py --payload-file original_import.txt --id 'YourName#1234' --output editable_guides.txt
 ```
 
-## API (v2.0.3)
+## API (original v2.0.3 editor, unchanged)
 
 - `GET /health`: status and version.
 - `POST /api/decrypt`: JSON `{ "battle_id": "YourName#1234", "payload": "<full import>" }`. Only optional `"format": "editable"` is accepted. Optional `source_filename` preserves the title before the first `!` in the editable file. Returns `<source>.txt` (fallback `editable_guides.txt`).
