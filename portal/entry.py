@@ -5,15 +5,13 @@ webapp.main here: its decrypt/encrypt endpoints must not exist on public mode.
 """
 from __future__ import annotations
 
-import base64
-import binascii
 import hashlib
 import hmac
-import ipaddress
 import json
 import logging
 import os
 import re
+import secrets
 import sqlite3
 import threading
 import time
@@ -22,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.concurrency import run_in_threadpool
 
 from rxp_decrypt import decode_chunk, derive_base, extract_chunks, initial_permutation
@@ -40,12 +38,17 @@ MAX_GUIDE = 16 * 1024 * 1024
 MAX_OUTPUT = 24 * 1024 * 1024
 ADMIN_USER = os.environ.get("RXP_PORTAL_ADMIN_USER", "")
 ADMIN_PASSWORD = os.environ.get("RXP_PORTAL_ADMIN_PASSWORD", "")
+COOKIE_SECURE = os.environ.get("RXP_PORTAL_COOKIE_SECURE", "false").lower() in {"1", "true", "yes"}
+COOKIE_NAME = "rxptool_admin_session"
+SESSION_LIFETIME = 8 * 60 * 60
+_SESSION_CAP = 128
 ID_PATTERN = re.compile(r"^[^#\x00-\x1f\x7f]{1,60}#[0-9]{4,10}$")
 STATIC = Path(__file__).resolve().parent / "static"
 LOG = logging.getLogger("rxptool.portal")
 SLOTS = threading.BoundedSemaphore(1)
 _lock = threading.Lock()
 _attempts = defaultdict(deque)
+_sessions: dict[bytes, float] = {}
 
 if ROLE == "admin" and (not ADMIN_USER or ":" in ADMIN_USER or len(ADMIN_PASSWORD) < 20):
     raise RuntimeError("Admin needs username and 20+ character password")
@@ -235,13 +238,11 @@ async def body_json(request: Request) -> dict:
     return obj
 
 
-def authenticated(request: Request) -> bool:
-    value = request.headers.get("authorization", "")
-    if not value.startswith("Basic ") or len(value) > 512:
+def credentials_match(name: object, password: object) -> bool:
+    """Compare both fields without echoing secrets or using HTTP Basic auth."""
+    if not isinstance(name, str) or not isinstance(password, str):
         return False
-    try:
-        name, password = base64.b64decode(value[6:], validate=True).decode("utf-8").split(":", 1)
-    except (ValueError, UnicodeError, binascii.Error):
+    if len(name) > 256 or len(password) > 1024:
         return False
     return bool(
         hmac.compare_digest(hashlib.sha256(name.encode()).digest(), hashlib.sha256(ADMIN_USER.encode()).digest())
@@ -249,22 +250,59 @@ def authenticated(request: Request) -> bool:
     )
 
 
+def session_digest(token: str) -> bytes:
+    return hashlib.sha256(token.encode("ascii")).digest()
+
+
+def authenticated(request: Request) -> bool:
+    """Sessions are volatile: process restart, timeout or logout revokes access."""
+    token = request.cookies.get(COOKIE_NAME, "")
+    if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9_-]{32,128}", token):
+        return False
+    current = time.monotonic()
+    with _lock:
+        expiry = _sessions.get(session_digest(token))
+        if expiry is not None and expiry <= current:
+            _sessions.pop(session_digest(token), None)
+        return expiry is not None and expiry > current
+
+
+def create_session() -> str:
+    current = time.monotonic()
+    token = secrets.token_urlsafe(32)
+    with _lock:
+        for key, expiry in list(_sessions.items()):
+            if expiry <= current:
+                del _sessions[key]
+        if len(_sessions) >= _SESSION_CAP:
+            # Prefer oldest expiry when the administrator has many sessions.
+            del _sessions[min(_sessions, key=_sessions.get)]
+        _sessions[session_digest(token)] = current + SESSION_LIFETIME
+    return token
+
+
+def valid_origin(request: Request) -> bool:
+    origin = request.headers.get("origin")
+    return not origin or origin.rstrip("/").lower() == str(request.base_url).rstrip("/").lower()
+
+
 app = FastAPI(title="RXPTool Portal", docs_url=None, redoc_url=None, openapi_url=None)
 
 
 @app.middleware("http")
 async def security(request: Request, call_next):
-    if ROLE == "admin" and request.url.path != "/health":
+    # Only these endpoints are accessible before logging into the private
+    # publisher. The public service has an entirely separate route table.
+    login_routes = {"/health", "/login", "/assets/style.css",
+                    "/assets/login.js", "/api/login"}
+    if ROLE == "admin" and request.url.path not in login_routes:
         if not authenticated(request):
-            response = error(401, "Authentication required")
-            response.headers["WWW-Authenticate"] = 'Basic realm="RXPTool publishing", charset="UTF-8"'
+            if request.method in {"GET", "HEAD"} and request.url.path in {"/", "/admin/publish"}:
+                response = RedirectResponse("/login", status_code=303)
+            else:
+                response = error(401, "Authentication required")
         elif request.method not in {"GET", "HEAD"} and (
-            request.headers.get("x-rxp-admin") != "1" or (
-                request.headers.get("origin") and (
-                    request.headers["origin"].rstrip("/").lower()
-                    != str(request.base_url).rstrip("/").lower()
-                )
-            )
+            request.headers.get("x-rxp-admin") != "1" or not valid_origin(request)
         ):
             response = error(403, "Request token or origin invalid")
         else:
@@ -306,6 +344,46 @@ def css():
 
 
 if ROLE == "admin":
+
+    @app.get("/login")
+    def login_page(request: Request):
+        if authenticated(request):
+            return RedirectResponse("/admin/publish", status_code=303)
+        return FileResponse(STATIC / "login.html", media_type="text/html")
+
+    @app.get("/assets/login.js")
+    def login_script():
+        return FileResponse(STATIC / "login.js", media_type="application/javascript")
+
+    @app.post("/api/login")
+    async def login(request: Request):
+        # Do not allow a cross-site HTML form to perform login CSRF.
+        if request.headers.get("x-rxp-login") != "1" or not valid_origin(request):
+            return error(403, "Request origin invalid")
+        peer = request.client.host if request.client else "unknown"
+        if not limit("login:" + peer, 8, period=300):
+            return error(429, "Too many login attempts. Try again later.")
+        try:
+            data = await body_json(request)
+        except ValueError as exc:
+            return error(400, str(exc))
+        if not credentials_match(data.get("username"), data.get("password")):
+            return error(401, "Invalid username or password")
+        response = JSONResponse({"ok": True})
+        response.set_cookie(COOKIE_NAME, create_session(), max_age=SESSION_LIFETIME,
+                            httponly=True, secure=COOKIE_SECURE, samesite="strict", path="/")
+        return response
+
+    @app.post("/api/logout")
+    def logout(request: Request):
+        token = request.cookies.get(COOKIE_NAME, "")
+        if isinstance(token, str) and re.fullmatch(r"[A-Za-z0-9_-]{32,128}", token):
+            with _lock:
+                _sessions.pop(session_digest(token), None)
+        response = JSONResponse({"ok": True})
+        response.delete_cookie(COOKIE_NAME, path="/", secure=COOKIE_SECURE,
+                               httponly=True, samesite="strict")
+        return response
 
     @app.get("/assets/admin.js")
     def admin_script():
