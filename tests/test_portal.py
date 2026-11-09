@@ -34,10 +34,16 @@ def load(role, tmp_path, monkeypatch):
     return importlib.reload(portal.entry)
 
 
-def credentials():
-    import base64
-    return {"Authorization": "Basic " + base64.b64encode(
-        b"administrator:a-very-strong-private-test-password").decode()}
+def sign_in(client):
+    response = client.post("/api/login",
+                           json={"username": "administrator",
+                                 "password": "a-very-strong-private-test-password"},
+                           headers={"X-RXP-Login": "1"})
+    assert response.status_code == 200, response.text
+    assert "httponly" in response.headers["set-cookie"].lower()
+    assert "samesite=strict" in response.headers["set-cookie"].lower()
+    assert "rxptool_admin_session" in client.cookies
+    return {"X-RXP-Admin": "1"}
 
 
 def test_native_encoder_roundtrip():
@@ -53,8 +59,10 @@ def test_native_encoder_roundtrip():
 def test_publisher_and_public_are_separate(tmp_path, monkeypatch):
     admin = load("admin", tmp_path, monkeypatch)
     with TestClient(admin.app) as a:
-        assert a.get("/admin/publish").status_code == 401
-        headers = {**credentials(), "X-RXP-Admin": "1"}
+        assert a.get("/admin/publish", follow_redirects=False).status_code == 303
+        assert a.get("/login").status_code == 200
+        assert a.get("/api/state").status_code == 401
+        headers = sign_in(a)
         assert a.get("/admin/publish", headers=headers).status_code == 200
         assert a.post("/api/allowlist/add", json={"battle_id": "PortalTest#1234"},
                       headers=headers).status_code == 200
@@ -85,10 +93,23 @@ def test_publisher_and_public_are_separate(tmp_path, monkeypatch):
 
 def test_admin_auth_csrf_and_rollback(tmp_path, monkeypatch):
     admin = load("admin", tmp_path, monkeypatch)
-    headers = {**credentials(), "X-RXP-Admin": "1"}
     with TestClient(admin.app) as client:
         assert client.post("/api/allowlist/add", json={"battle_id": "PortalTest#1234"},
-                           headers=credentials()).status_code == 403
+                           headers={"X-RXP-Admin": "1"}).status_code == 401
+        assert client.post("/api/login",
+                           json={"username": "administrator", "password": "wrong"},
+                           headers={"X-RXP-Login": "1"}).status_code == 401
+        assert client.post("/api/login",
+                           json={"username": "administrator",
+                                 "password": "a-very-strong-private-test-password"}).status_code == 403
+        assert client.post("/api/login",
+                           json={"username": "administrator",
+                                 "password": "a-very-strong-private-test-password"},
+                           headers={"X-RXP-Login": "1",
+                                    "Origin": "https://evil.example"}).status_code == 403
+        headers = sign_in(client)
+        assert client.get("/login", follow_redirects=False).status_code == 303
+        assert client.post("/api/allowlist/add", json={"battle_id": "PortalTest#1234"}).status_code == 403
         assert client.post("/api/allowlist/add", json={"battle_id": "PortalTest#1234"},
                            headers={**headers, "Origin": "https://evil.example"}).status_code == 403
         assert client.post("/api/allowlist/add", json={"battle_id": "PortalTest#1234"},
@@ -103,3 +124,24 @@ def test_admin_auth_csrf_and_rollback(tmp_path, monkeypatch):
         assert client.post("/api/allowlist/remove", json={"battle_id": "PortalTest#1234"},
                            headers=headers).status_code == 200
         assert client.get("/api/state", headers=headers).json()["allowlist"] == []
+        assert client.post("/api/logout", headers=headers).status_code == 200
+        assert client.get("/api/state").status_code == 401
+        assert client.get("/admin/publish", follow_redirects=False).headers["location"] == "/login"
+
+def test_admin_session_restarts_and_public_auth_isolation(tmp_path, monkeypatch):
+    admin = load("admin", tmp_path, monkeypatch)
+    with TestClient(admin.app) as client:
+        sign_in(client)
+        assert client.get("/api/state").status_code == 200
+        # An application restart invalidates memory-resident sessions.
+        new_app = load("admin", tmp_path, monkeypatch)
+        with TestClient(new_app.app) as restarted:
+            restarted.cookies.set("rxptool_admin_session",
+                                  client.cookies.get("rxptool_admin_session"))
+            assert restarted.get("/api/state").status_code == 401
+
+    public = load("public", tmp_path, monkeypatch)
+    with TestClient(public.app) as client:
+        for url in ("/login", "/assets/login.js", "/api/login", "/api/logout"):
+            assert client.get(url).status_code == 404
+        assert client.post("/api/login", json={}).status_code == 404
