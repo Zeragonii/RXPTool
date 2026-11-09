@@ -205,3 +205,39 @@ def test_public_page_settings_persist_update_live_and_escape_html(tmp_path, monk
         persisted = c.get("/api/state").json()["public_page"]
         assert persisted["headline"] == "Changed live"
         assert persisted["message"] == payload["message"]
+
+
+def test_public_pirate_design_preserves_dynamic_copy_and_download_contract(tmp_path, monkeypatch):
+    admin = load("admin", tmp_path, monkeypatch)
+    with TestClient(admin.app) as client:
+        headers = sign_in(client)
+        changed = client.post(
+            "/api/settings/public-page",
+            headers=headers,
+            json={
+                "headline": "Raise the Red <Sails>!",
+                "message": 'Latest guides & fresh loot\nClaim yours today.'
+            },
+        )
+        assert changed.status_code == 200, changed.text
+
+    public = load("public", tmp_path, monkeypatch)
+    with TestClient(public.app) as client:
+        response = client.get("/download")
+        assert response.status_code == 200
+        assert "THE PRIVATEER'S CACHE" in response.text
+        assert "public-crest" in response.text
+        assert "Raise the Red &lt;Sails&gt;!" in response.text
+        assert "Latest guides &amp; fresh loot\nClaim yours today." in response.text
+        assert "{{PUBLIC_HEADLINE}}" not in response.text
+        assert "{{PUBLIC_MESSAGE}}" not in response.text
+        assert 'id="form"' in response.text
+        assert 'id="id"' in response.text
+        assert 'id="submit"' in response.text
+        assert 'id="status"' in response.text
+        assert '/assets/download.js' in response.text
+        css = client.get("/assets/style.css")
+        assert css.status_code == 200
+        assert "public-download-page" in css.text
+        assert "public-deck" in css.text
+        assert client.get("/api/state").status_code == 404
