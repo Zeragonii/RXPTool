@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>RXPTool · Admin login</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <script src="/assets/login.js" defer></script>
+</head>
+<body>
+  <main class="narrow">
+    <div class="brand">RXPTool <span>Publishing</span></div>
+    <div class="panel login-card">
+      <h1>Administrator sign in</h1>
+      <p>Log in to publish guide updates and manage approved Battle.net IDs.</p>
+      <form id="login-form" autocomplete="on">
+        <label for="username">Username</label>
+        <input id="username" name="username" type="text" autocomplete="username"
+               maxlength="256" required autofocus>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password"
+               autocomplete="current-password" required>
+        <button type="submit" id="submit">Sign in</button>
+      </form>
+      <p class="status" role="status" id="login-status" aria-live="polite"></p>
+    </div>
+    <footer>Private administrator interface. This page is not part of the public download portal.</footer>
+  </main>
+</body>
+</html>
