@@ -60,3 +60,9 @@ From the **private publisher** at `/admin/publish`, find the **Public downloads 
 ## Public download filenames
 
 All public guide downloads are named consistently as `RXPTool!BattleTag#1234_YYYY-MM-DD_HH-MM.txt` (UTC). The uploaded guide's original filename does not affect the download name. This uses the original editor's safe Windows filename and Content-Disposition logic, preserves the # in BattleTags, and supports Unicode BattleTags in browsers. The encrypted guide content is unchanged.
+
+## Public guide last-updated indicator
+
+The public Privateer's Cache page shows a gold-accented **Guide last updated ... ago** label beneath the configurable description. It derives from the existing UTC `publication.published_at` timestamp in the SQLite volume, recorded on each successful upload (and refreshed when a version is restored).
+
+The label shows just now, minutes, hours, days, weeks, months or years as appropriate, with the exact publication date and UTC time available on hover. The relative age is recalculated on every public page load; no new API endpoints, JavaScript, configuration, or database migration are required. Before the first publication the page shows **Awaiting first guide publication**.

@@ -285,3 +285,90 @@ def test_public_download_filename_supports_unicode_battletags(tmp_path, monkeypa
             r'RXPTool!Piratañ#1234_20\d{2}-\d{2}-\d{2}_\d{2}-\d{2}\.txt',
             unquote(extended),
         )
+
+
+def test_publication_age_relative_units(tmp_path, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    portal = load("admin", tmp_path, monkeypatch)
+    fixed = datetime(2026, 11, 10, 12, 0, tzinfo=timezone.utc)
+    cases = (
+        (timedelta(seconds=0), "just now"),
+        (timedelta(seconds=59), "just now"),
+        (timedelta(minutes=1), "1 minute ago"),
+        (timedelta(minutes=12), "12 minutes ago"),
+        (timedelta(hours=1), "1 hour ago"),
+        (timedelta(hours=23), "23 hours ago"),
+        (timedelta(days=1), "1 day ago"),
+        (timedelta(days=4), "4 days ago"),
+        (timedelta(days=7), "1 week ago"),
+        (timedelta(days=21), "3 weeks ago"),
+        (timedelta(days=30), "1 month ago"),
+        (timedelta(days=90), "3 months ago"),
+        (timedelta(days=365), "1 year ago"),
+        (timedelta(days=730), "2 years ago"),
+        (timedelta(days=-1), "just now"),
+    )
+    for elapsed, expected in cases:
+        assert portal.relative_publication_age(fixed - elapsed, current=fixed) == expected
+
+
+def test_publication_badge_when_nothing_published(tmp_path, monkeypatch):
+    load("admin", tmp_path, monkeypatch)
+    public = load("public", tmp_path, monkeypatch)
+    with TestClient(public.app) as client:
+        page = client.get("/download")
+        assert page.status_code == 200
+        assert "Awaiting first guide publication" in page.text
+        assert "Guide last updated" not in page.text
+
+
+def test_publication_age_is_live_and_uses_existing_published_timestamp(tmp_path, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    admin = load("admin", tmp_path, monkeypatch)
+    with TestClient(admin.app) as client:
+        headers = sign_in(client)
+        # Existing deployments contain no publication until the first upload.
+        assert client.get("/api/state").json()["current"] is None
+        assert client.post("/api/publish", content=DOCUMENT, headers={
+            **headers, "Content-Type": "application/octet-stream"}).status_code == 200
+        initial = client.get("/api/state").json()["current"]["published_at"]
+        assert initial
+
+    public = load("public", tmp_path, monkeypatch)
+    with TestClient(public.app) as client:
+        page = client.get("/download")
+        assert page.status_code == 200
+        assert "Guide last updated" in page.text
+        assert "just now</time>" in page.text
+        assert "title=" in page.text
+        assert initial in page.text
+
+        # The public container reads publication metadata on every page
+        # load, so the visible age changes without restarting the service.
+        historical = (datetime.now(timezone.utc) - timedelta(days=20)).isoformat(timespec="seconds")
+        with sqlite3.connect(tmp_path / "data.db") as db:
+            db.execute("UPDATE publication SET published_at=? WHERE singleton=1", (historical,))
+        aged = client.get("/download")
+        assert "Guide last updated" in aged.text
+        assert "2 weeks ago</time>" in aged.text
+        assert historical in aged.text
+        assert aged.headers["Cache-Control"] == "no-store"
+
+        with sqlite3.connect(tmp_path / "data.db") as db:
+            db.execute("UPDATE publication SET published_at=? WHERE singleton=1",
+                       ((datetime.now(timezone.utc) - timedelta(days=400)).isoformat(timespec="seconds"),))
+        assert "1 year ago</time>" in client.get("/download").text
+
+    # The timestamp is refreshed when a new upload is published.
+    admin = load("admin", tmp_path, monkeypatch)
+    with TestClient(admin.app) as client:
+        headers = sign_in(client)
+        pub = client.post("/api/publish", content=DOCUMENT, headers={
+            **headers, "Content-Type": "application/octet-stream"})
+        assert pub.status_code == 200
+        assert pub.json()["published"]["version"] == 2
+    public = load("public", tmp_path, monkeypatch)
+    with TestClient(public.app) as client:
+        assert "just now</time>" in client.get("/download").text
