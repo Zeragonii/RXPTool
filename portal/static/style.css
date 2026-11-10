@@ -339,3 +339,12 @@ body.public-download-page::before {
   font-weight: 700;
   white-space: nowrap;
 }
+
+/* Private publisher navigation only; no public-downloader links to admin. */
+.admin-workspace-nav{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0 8px}
+.admin-workspace-nav a{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border:1px solid #425673;border-radius:8px;color:#b9cee8;background:#13223a;padding:10px 15px;font-size:.88rem;font-weight:700}
+.admin-workspace-nav a:hover{background:#233b59;color:#fff}
+.admin-workspace-nav a:focus-visible{outline:2px solid #80b4ff;outline-offset:3px}
+.admin-workspace-nav a.current{background:#80b4ff;color:#091427;border-color:#80b4ff}
+.admin-workspace-nav a[hidden]{display:none}
+#navigation-settings input{margin-bottom:10px}
