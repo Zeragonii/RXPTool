@@ -64,7 +64,9 @@ def test_publisher_and_public_are_separate(tmp_path, monkeypatch):
         assert a.get("/login").status_code == 200
         assert a.get("/api/state").status_code == 401
         headers = sign_in(a)
-        assert a.get("/admin/publish", headers=headers).status_code == 200
+        admin_page = a.get("/admin/publish", headers=headers)
+        assert admin_page.status_code == 200
+        assert "img-src 'self'" not in admin_page.headers["Content-Security-Policy"]
         assert a.post("/api/allowlist/add", json={"battle_id": "PortalTest#1234"},
                       headers=headers).status_code == 200
         result = a.post("/api/publish", content=DOCUMENT,
@@ -242,6 +244,10 @@ def test_public_pirate_design_preserves_dynamic_copy_and_download_contract(tmp_p
         assert 'id="status"' in response.text
         assert '/assets/download.js' in response.text
         assert '<link rel="icon" type="image/svg+xml" sizes="any" href="/assets/favicon.svg">' in response.text
+        policy = response.headers["Content-Security-Policy"]
+        assert "default-src 'none'" in policy
+        assert "img-src 'self'" in policy
+        assert "img-src *" not in policy
         favicon = client.get("/assets/favicon.svg")
         assert favicon.status_code == 200
         assert favicon.headers["content-type"].startswith("image/svg+xml")
