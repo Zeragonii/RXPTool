@@ -74,3 +74,9 @@ The publisher's private **Publishing** dashboard now includes navigation to the 
 For a return link **from the original editor** to the publisher, optionally set `RXP_PORTAL_ADMIN_URL=http://PRIVATE-SERVER:8788/admin/publish` in the **original editor stack**, then update that original stack with an image that includes this feature (currently the `:edge` image). Both Decrypt and Encrypt show a **Publishing** tab only when this is configured. The link opens a separate tab and is not an authentication shortcut. Do not set this on an internet-facing editor if you want to keep the private dashboard hostname/address undisclosed. **Never expose the publisher's port publicly** merely to make a link work: browser access to that private host over LAN/VPN is still required.
 
 Links use explicit HTTP(S) URLs without credentials/query fragments, open external destinations with `noopener noreferrer`, and leave existing user authentication, session cookies, permissions and routing intact. The public downloads page does not gain an admin link.
+
+## Classic editor look for the private admin
+
+The publishing dashboard and sign-in page use the same visual language as the original RXPTool Decrypt and Encrypt screens: midnight navy, soft blue ambient glows, mint/teal gradients, the original editor emblem, segmented workspace navigation, rounded panels, and responsive two-column layout. Existing guide publication, allowlist, rollback, custom public text, private navigation settings, and sign-in controls retain their IDs and behaviour.
+
+This is a stylesheet and HTML-only update, using no external assets, inline scripts, new data fields, new ports, or changed CSP rules. **The public download site keeps its Bloodsail theme unchanged.** Update the existing portal Portainer stack using `ghcr.io/zeragonii/rxptool:edge` with **Re-pull image and redeploy**.
