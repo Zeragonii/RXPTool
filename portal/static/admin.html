@@ -1,1 +1,107 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>RXPTool · Publishing</title><link rel="stylesheet" href="/assets/style.css"><script src="/assets/admin.js" defer></script><script src="/assets/settings.js" defer></script><script src="/assets/navigation.js" defer></script></head><body><main><div class="brand">RXPTool <span>Publishing</span></div><div class="topbar"><h1>Guide publication and access</h1><button id="logout" type="button" class="secondary">Log out</button></div><nav class="admin-workspace-nav" aria-label="RXPTool workspaces"><a class="current" href="/admin/publish" aria-current="page">Publishing</a><a id="nav-decrypt" hidden target="_blank" rel="noopener noreferrer">Decrypt</a><a id="nav-encrypt" hidden target="_blank" rel="noopener noreferrer">Encrypt</a><a id="nav-public" hidden target="_blank" rel="noopener noreferrer">Public downloads</a></nav><p class="muted">Jump between your private editor, the publishing dashboard and the public downloads page. Other sites still require their own access controls.</p><section class="panel" id="navigation-settings"><h2>Workspace links</h2><p class="muted">Enter your existing site addresses once. These links appear only inside this private dashboard. Leave a field blank to hide its links.</p><form id="navigation-form"><label for="editor-url">Original editor address (Decrypt and Encrypt)</label><input id="editor-url" type="url" maxlength="512" placeholder="http://YOUR-SERVER-IP:8787" autocomplete="url"><label for="public-url">Public downloads address</label><input id="public-url" type="url" maxlength="512" placeholder="https://rxp.example.com/download" autocomplete="url"><button id="navigation-save" type="submit">Save navigation links</button></form><p id="navigation-status" class="status" role="status" aria-live="polite"></p></section><section class="panel" id="public-page-settings"><h2>Public downloads page</h2><p class="muted">Edit the text visitors see on the public download page. Changes are saved immediately without republishing a guide or redeploying Portainer.</p><form id="public-page-form"><label for="public-headline">Page headline</label><input id="public-headline" type="text" maxlength="160" required><label for="public-message">Message underneath</label><textarea id="public-message" maxlength="1000" rows="4" required></textarea><button type="submit" id="public-page-save">Save public page text</button></form><div class="public-preview" aria-label="Live preview"><span class="muted">Preview</span><h3 id="public-preview-headline"></h3><p id="public-preview-message"></p></div><p id="public-page-status" class="status" role="status" aria-live="polite"></p></section><section class="panel"><h2>Latest published guide</h2><p id="publication">Loading…</p><form id="publish"><label for="guide">Publish editable guide TXT</label><input id="guide" type="file" accept=".txt,text/plain" required><button id="publishbutton" type="submit">Validate &amp; publish</button></form><p class="muted">Only the RXPTool #!RXPTOOL/1 editable document format is accepted (maximum 16 MiB).</p></section><section class="panel"><h2>Approved Battle.net IDs</h2><form id="add"><label for="id">Battle.net ID</label><div class="controls"><input id="id" placeholder="YourName#1234" maxlength="128" required><button type="submit">Add ID</button></div></form><ul id="ids"></ul></section><section class="panel"><h2>Rollback history</h2><p class="muted">The last three published versions are retained.</p><ul id="history"></ul></section><p id="status" role="status" class="status"></p><footer>Keep this interface private. Do not route it to the public reverse proxy.</footer></main></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#09101d">
+  <title>RXPTool · Publishing workspace</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <script src="/assets/admin.js" defer></script>
+  <script src="/assets/settings.js" defer></script>
+  <script src="/assets/navigation.js" defer></script>
+</head>
+<body class="publisher-admin">
+  <div class="publisher-ambient publisher-ambient-blue" aria-hidden="true"></div>
+  <div class="publisher-ambient publisher-ambient-teal" aria-hidden="true"></div>
+  <div class="publisher-shell">
+    <header class="publisher-topbar">
+      <div class="publisher-brand">
+        <svg viewBox="0 0 48 48" width="45" height="45" fill="none" aria-hidden="true" focusable="false"><rect x=".5" y=".5" width="47" height="47" rx="14" fill="#172A3E" stroke="#385168"/><g transform="translate(9 9) scale(.75)"><path d="M20 3L35.5 11.5V28.5L20 37L4.5 28.5V11.5L20 3Z" stroke="#8CDFFF" stroke-width="2.5"/><path d="M13 14H26L18 22H27" stroke="#8CDFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 27H24" stroke="#5EEAD4" stroke-width="3" stroke-linecap="round"/></g></svg>
+        <div class="publisher-brand-name">RXP <strong>Tool</strong><small>PRIVATE PUBLISHING WORKSPACE</small></div>
+      </div>
+      <div class="publisher-top-actions">
+        <span class="publisher-private-label"><span class="publisher-dot" aria-hidden="true"></span>Authenticated workspace</span>
+        <button id="logout" type="button" class="secondary">Log out</button>
+      </div>
+    </header>
+
+    <nav class="admin-workspace-nav" aria-label="RXPTool workspaces">
+      <a class="current" href="/admin/publish" aria-current="page">Publishing</a>
+      <a id="nav-decrypt" hidden target="_blank" rel="noopener noreferrer">Decrypt</a>
+      <a id="nav-encrypt" hidden target="_blank" rel="noopener noreferrer">Encrypt</a>
+      <a id="nav-public" hidden target="_blank" rel="noopener noreferrer">Public downloads</a>
+    </nav>
+
+    <main class="publisher-main">
+      <section class="publisher-hero">
+        <div class="publisher-eyebrow"><span class="publisher-eyebrow-line"></span> CONTROL. PUBLISH. VERIFY.</div>
+        <h1>Guide publishing, <span>under your control.</span></h1>
+        <p>Manage your guide releases, approved accounts and public download settings from one secure workspace.</p>
+        <div class="publisher-hero-points"><span><b aria-hidden="true">✓</b> Verified guide uploads</span><span><b aria-hidden="true">✓</b> Account allowlist</span><span><b aria-hidden="true">✓</b> Version rollback</span></div>
+      </section>
+
+      <div class="publisher-grid">
+        <div class="publisher-column">
+          <section class="panel publisher-panel" aria-labelledby="publication-title">
+            <div class="publisher-panel-heading"><div><span class="publisher-overline">PUBLICATION CONTROL</span><h2 id="publication-title">Latest published guide</h2></div><span class="publisher-counter">01 / 05</span></div>
+            <div class="publisher-info-box"><span class="publisher-small-label">CURRENT RELEASE</span><p id="publication" aria-live="polite">Loading…</p></div>
+            <form id="publish">
+              <label for="guide">Publish an editable guide TXT</label>
+              <input id="guide" type="file" accept=".txt,text/plain" required>
+              <button id="publishbutton" type="submit">Validate &amp; publish <span aria-hidden="true">↗</span></button>
+            </form>
+            <p class="muted publisher-hint">Accepts RXPTool <code>#!RXPTOOL/1</code> editable TXT documents, up to 16 MiB. A full native round-trip is verified before publication.</p>
+          </section>
+
+          <section class="panel publisher-panel" aria-labelledby="allowlist-title">
+            <div class="publisher-panel-heading"><div><span class="publisher-overline">ACCESS CONTROL</span><h2 id="allowlist-title">Approved Battle.net IDs</h2></div><span class="publisher-counter">02 / 05</span></div>
+            <p class="muted publisher-panel-description">Only IDs on this list can request account-specific encrypted guide downloads.</p>
+            <form id="add"><label for="id">Battle.net ID</label><div class="controls"><input id="id" placeholder="YourName#1234" maxlength="128" required><button type="submit">Add ID</button></div></form>
+            <ul id="ids" class="publisher-list" aria-label="Approved accounts"></ul>
+          </section>
+
+          <section class="panel publisher-panel" aria-labelledby="rollback-title">
+            <div class="publisher-panel-heading"><div><span class="publisher-overline">RELEASE HISTORY</span><h2 id="rollback-title">Rollback history</h2></div><span class="publisher-counter">03 / 05</span></div>
+            <p class="muted publisher-panel-description">Your last three releases are retained. Restore an earlier guide without uploading it again.</p>
+            <ul id="history" class="publisher-list" aria-label="Previous guide versions"></ul>
+          </section>
+        </div>
+
+        <div class="publisher-column">
+          <section class="panel publisher-panel" id="public-page-settings" aria-labelledby="public-page-title">
+            <div class="publisher-panel-heading"><div><span class="publisher-overline">PUBLIC PRESENTATION</span><h2 id="public-page-title">Public downloads page</h2></div><span class="publisher-counter">04 / 05</span></div>
+            <p class="muted publisher-panel-description">Edit what visitors see at the Privateer's Cache. Save instantly, without redeploying or republishing a guide.</p>
+            <form id="public-page-form">
+              <label for="public-headline">Page headline</label>
+              <input id="public-headline" type="text" maxlength="160" required>
+              <label for="public-message">Message underneath</label>
+              <textarea id="public-message" maxlength="1000" rows="4" required></textarea>
+              <button type="submit" id="public-page-save">Save public page text <span aria-hidden="true">↗</span></button>
+            </form>
+            <div class="public-preview" aria-label="Live preview"><span class="publisher-small-label">LIVE PREVIEW</span><h3 id="public-preview-headline"></h3><p id="public-preview-message"></p></div>
+            <p id="public-page-status" class="status" role="status" aria-live="polite"></p>
+          </section>
+
+          <section class="panel publisher-panel" id="navigation-settings" aria-labelledby="navigation-title">
+            <div class="publisher-panel-heading"><div><span class="publisher-overline">WORKSPACE CONNECTIONS</span><h2 id="navigation-title">Workspace links</h2></div><span class="publisher-counter">05 / 05</span></div>
+            <p class="muted publisher-panel-description">Connect your existing editor and public download URLs. Links are visible only in this private dashboard.</p>
+            <form id="navigation-form">
+              <label for="editor-url">Original editor address</label>
+              <input id="editor-url" type="url" maxlength="512" placeholder="http://YOUR-SERVER-IP:8787" autocomplete="url">
+              <label for="public-url">Public downloads address</label>
+              <input id="public-url" type="url" maxlength="512" placeholder="https://rxp.example.com/download" autocomplete="url">
+              <button id="navigation-save" type="submit">Save navigation links <span aria-hidden="true">↗</span></button>
+            </form>
+            <p id="navigation-status" class="status" role="status" aria-live="polite"></p>
+          </section>
+        </div>
+      </div>
+      <p id="status" role="status" class="status publisher-global-status" aria-live="polite"></p>
+      <div class="publisher-privacy"><span aria-hidden="true">◇</span><span>Private by design <small>This admin interface should remain accessible only over a trusted LAN or VPN.</small></span></div>
+    </main>
+
+    <footer class="publisher-footer"><span>RXP Tool <span class="publisher-footer-sep">/</span> Publishing workspace</span><span>Independent utility · Not affiliated with RestedXP</span></footer>
+  </div>
+</body>
+</html>

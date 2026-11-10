@@ -4,28 +4,41 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#09101d">
   <title>RXPTool · Admin login</title>
   <link rel="stylesheet" href="/assets/style.css">
   <script src="/assets/login.js" defer></script>
 </head>
-<body>
-  <main class="narrow">
-    <div class="brand">RXPTool <span>Publishing</span></div>
-    <div class="panel login-card">
-      <h1>Administrator sign in</h1>
-      <p>Log in to publish guide updates and manage approved Battle.net IDs.</p>
-      <form id="login-form" autocomplete="on">
-        <label for="username">Username</label>
-        <input id="username" name="username" type="text" autocomplete="username"
-               maxlength="256" required autofocus>
-        <label for="password">Password</label>
-        <input id="password" name="password" type="password"
-               autocomplete="current-password" required>
-        <button type="submit" id="submit">Sign in</button>
-      </form>
-      <p class="status" role="status" id="login-status" aria-live="polite"></p>
-    </div>
-    <footer>Private administrator interface. This page is not part of the public download portal.</footer>
-  </main>
+<body class="publisher-login">
+  <div class="publisher-ambient publisher-ambient-blue" aria-hidden="true"></div>
+  <div class="publisher-ambient publisher-ambient-teal" aria-hidden="true"></div>
+  <div class="publisher-shell">
+    <header class="publisher-topbar">
+      <div class="publisher-brand">
+        <svg viewBox="0 0 48 48" width="45" height="45" fill="none" aria-hidden="true" focusable="false"><rect x=".5" y=".5" width="47" height="47" rx="14" fill="#172A3E" stroke="#385168"/><g transform="translate(9 9) scale(.75)"><path d="M20 3L35.5 11.5V28.5L20 37L4.5 28.5V11.5L20 3Z" stroke="#8CDFFF" stroke-width="2.5"/><path d="M13 14H26L18 22H27" stroke="#8CDFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 27H24" stroke="#5EEAD4" stroke-width="3" stroke-linecap="round"/></g></svg>
+        <div class="publisher-brand-name">RXP <strong>Tool</strong><small>PRIVATE PUBLISHING WORKSPACE</small></div>
+      </div>
+      <div class="publisher-private-label"><span class="publisher-dot" aria-hidden="true"></span>Private workspace</div>
+    </header>
+    <main class="publisher-login-main">
+      <div class="publisher-eyebrow"><span class="publisher-eyebrow-line"></span> SECURE WORKSPACE ACCESS</div>
+      <section class="panel login-card" aria-labelledby="login-title">
+        <div class="publisher-login-emblem" aria-hidden="true">◇</div>
+        <span class="publisher-overline">PUBLISHER AUTHENTICATION</span>
+        <h1 id="login-title">Welcome <span>back.</span></h1>
+        <p>Sign in to publish guide updates, manage approved accounts and configure your download portal.</p>
+        <form id="login-form" autocomplete="on">
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" autocomplete="username" maxlength="256" required autofocus>
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+          <button type="submit" id="submit">Sign in to workspace <span aria-hidden="true">↗</span></button>
+        </form>
+        <p class="status" role="status" id="login-status" aria-live="polite"></p>
+      </section>
+      <div class="publisher-login-note"><span aria-hidden="true">◇</span> Session protected · Trusted network access only</div>
+    </main>
+    <footer class="publisher-footer"><span>RXP Tool <span class="publisher-footer-sep">/</span> Publishing workspace</span><span>Private administrator interface · Not part of the public download portal</span></footer>
+  </div>
 </body>
 </html>

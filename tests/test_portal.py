@@ -445,3 +445,76 @@ def test_private_workspace_links_persist_and_public_cannot_access_them(tmp_path,
                             json={"editor_url": "", "public_url": ""})
         assert clear.status_code == 200
         assert clear.json()["navigation"] == {"editor_url": "", "public_url": ""}
+
+
+def test_classic_editor_publisher_theme_keeps_forms_and_authentication(tmp_path, monkeypatch):
+    """Private workspace restyle must not rename any live JS/API hook IDs."""
+    admin = load("admin", tmp_path, monkeypatch)
+    with TestClient(admin.app) as c:
+        # Unauthenticated callers still cannot access publisher content.
+        assert c.get("/admin/publish", follow_redirects=False).status_code == 303
+        login = c.get("/login")
+        assert login.status_code == 200
+        assert 'class="publisher-login"' in login.text
+        assert 'id="login-form"' in login.text
+        assert 'id="username"' in login.text
+        assert 'id="password"' in login.text
+        assert 'id="submit"' in login.text
+        assert 'id="login-status"' in login.text
+        assert 'PRIVATE PUBLISHING WORKSPACE' in login.text
+        assert 'stroke="#5EEAD4"' in login.text
+        assert "script-src 'self'" in login.headers["Content-Security-Policy"]
+
+        sign_in(c)
+        page = c.get("/admin/publish")
+        assert page.status_code == 200
+        assert 'class="publisher-admin"' in page.text
+        assert 'class="publisher-grid"' in page.text
+        assert 'class="publisher-hero"' in page.text
+        assert 'PRIVATE PUBLISHING WORKSPACE' in page.text
+        assert 'stroke="#5EEAD4"' in page.text
+        for element_id in (
+            "logout", "nav-decrypt", "nav-encrypt", "nav-public",
+            "publication", "publish", "guide", "publishbutton",
+            "add", "id", "ids", "history", "status",
+            "public-page-settings", "public-page-form", "public-headline",
+            "public-message", "public-page-save", "public-preview-headline",
+            "public-preview-message", "public-page-status",
+            "navigation-settings", "navigation-form", "editor-url",
+            "public-url", "navigation-save", "navigation-status",
+        ):
+            assert f'id="{element_id}"' in page.text
+
+        for filename in ("admin.js", "settings.js", "navigation.js"):
+            assert f'/assets/{filename}' in page.text
+        assert "default-src 'none'" in page.headers["Content-Security-Policy"]
+        assert "unsafe-inline" not in page.headers["Content-Security-Policy"]
+        css = c.get("/assets/style.css")
+        assert css.status_code == 200
+        assert "body.publisher-admin" in css.text
+        assert "body.publisher-login" in css.text
+        assert "--work-teal: #6cebd4;" in css.text
+        assert "--work-blue: #6d9df8;" in css.text
+
+        # All functional admin APIs retain their original semantics.
+        state = c.get("/api/state")
+        assert state.status_code == 200
+        assert state.json()["navigation"] == {"editor_url": "", "public_url": ""}
+        assert c.post("/api/allowlist/add", json={"battle_id": "Cosmetic#1234"},
+                      headers={"X-RXP-Admin": "1"}).status_code == 200
+        assert "Cosmetic#1234" in c.get("/api/state").json()["allowlist"]
+
+
+def test_classic_publisher_theme_does_not_affect_public_pirate_page(tmp_path, monkeypatch):
+    load("admin", tmp_path, monkeypatch)
+    public = load("public", tmp_path, monkeypatch)
+    with TestClient(public.app) as c:
+        page = c.get("/download")
+        assert page.status_code == 200
+        assert 'class="public-download-page"' in page.text
+        assert "THE PRIVATEER'S CACHE" in page.text
+        assert "publisher-admin" not in page.text
+        assert "PRIVATE PUBLISHING WORKSPACE" not in page.text
+        assert "public-crest" in page.text
+        assert '/assets/favicon.svg' in page.text
+        assert c.get("/assets/style.css").status_code == 200
