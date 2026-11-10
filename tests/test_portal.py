@@ -313,6 +313,16 @@ def test_publication_age_relative_units(tmp_path, monkeypatch):
         assert portal.relative_publication_age(fixed - elapsed, current=fixed) == expected
 
 
+def test_publication_badge_when_nothing_published(tmp_path, monkeypatch):
+    load("admin", tmp_path, monkeypatch)
+    public = load("public", tmp_path, monkeypatch)
+    with TestClient(public.app) as client:
+        page = client.get("/download")
+        assert page.status_code == 200
+        assert "Awaiting first guide publication" in page.text
+        assert "Guide last updated" not in page.text
+
+
 def test_publication_age_is_live_and_uses_existing_published_timestamp(tmp_path, monkeypatch):
     from datetime import datetime, timedelta, timezone
 
