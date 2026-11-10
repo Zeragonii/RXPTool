@@ -126,6 +126,59 @@ def metadata() -> dict | None:
         return dict(item) if item else None
 
 
+def relative_publication_age(published_at: datetime, current: datetime | None = None) -> str:
+    """Return a short human-readable age for the published guide.
+
+    All publication timestamps are recorded in UTC. Approximate months and
+    years use 30 and 365 days respectively; this is display-only.
+    """
+    current = current or datetime.now(timezone.utc)
+    if published_at.tzinfo is None:
+        published_at = published_at.replace(tzinfo=timezone.utc)
+    seconds = max(0, int((current - published_at).total_seconds()))
+    if seconds < 60:
+        return "just now"
+
+    minutes = seconds // 60
+    hours = seconds // 3600
+    days = seconds // 86400
+    if minutes < 60:
+        count, unit = minutes, "minute"
+    elif hours < 24:
+        count, unit = hours, "hour"
+    elif days < 7:
+        count, unit = days, "day"
+    elif days < 30:
+        count, unit = days // 7, "week"
+    elif days < 365:
+        count, unit = days // 30, "month"
+    else:
+        count, unit = days // 365, "year"
+    return f"{count} {unit}{'' if count == 1 else 's'} ago"
+
+
+def public_publication_status() -> str:
+    """Trusted HTML snippet; only server-authored content is inserted."""
+    published = metadata()
+    if not published:
+        return "Awaiting first guide publication"
+    try:
+        published_at = datetime.fromisoformat(published["published_at"])
+        if published_at.tzinfo is None:
+            published_at = published_at.replace(tzinfo=timezone.utc)
+        published_at = published_at.astimezone(timezone.utc)
+    except (ValueError, TypeError, KeyError):
+        LOG.warning("Published guide contains an invalid timestamp")
+        return "Publication date unavailable"
+
+    age = html.escape(relative_publication_age(published_at))
+    iso = html.escape(published_at.isoformat(timespec="seconds"), quote=True)
+    exact = html.escape(published_at.strftime("%d %B %Y at %H:%M UTC"), quote=True)
+    return (
+        f'Guide last updated <time datetime="{iso}" title="{exact}">{age}</time>'
+    )
+
+
 def get_public_page_settings() -> dict[str, str]:
     """Get the latest saved public text on every request (no restart needed)."""
     settings = {
@@ -392,7 +445,8 @@ def home():
         return FileResponse(STATIC / "admin.html", media_type="text/html")
     values = get_public_page_settings()
     template = (STATIC / "download.html").read_text(encoding="utf-8")
-    content = (template.replace("{{PUBLIC_HEADLINE}}", html.escape(values["headline"], quote=True))
+    content = (template.replace("{{PUBLIC_LAST_UPDATED}}", public_publication_status())
+                       .replace("{{PUBLIC_HEADLINE}}", html.escape(values["headline"], quote=True))
                        .replace("{{PUBLIC_MESSAGE}}", html.escape(values["message"], quote=True)))
     return Response(content, media_type="text/html; charset=utf-8")
 
