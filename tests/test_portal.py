@@ -66,7 +66,7 @@ def test_publisher_and_public_are_separate(tmp_path, monkeypatch):
         headers = sign_in(a)
         admin_page = a.get("/admin/publish", headers=headers)
         assert admin_page.status_code == 200
-        assert "img-src 'self'" not in admin_page.headers["Content-Security-Policy"]
+        assert "img-src 'self'" in admin_page.headers["Content-Security-Policy"]
         assert a.post("/api/allowlist/add", json={"battle_id": "PortalTest#1234"},
                       headers=headers).status_code == 200
         result = a.post("/api/publish", content=DOCUMENT,
@@ -518,3 +518,49 @@ def test_classic_publisher_theme_does_not_affect_public_pirate_page(tmp_path, mo
         assert "public-crest" in page.text
         assert '/assets/favicon.svg' in page.text
         assert c.get("/assets/style.css").status_code == 200
+
+
+def test_private_admin_uses_exact_classic_editor_favicon_assets(tmp_path, monkeypatch):
+    admin = load("admin", tmp_path, monkeypatch)
+    original_assets = Path(__file__).resolve().parents[1] / "webapp" / "static"
+    assets = (
+        ("/assets/favicon.svg", "favicon.svg", "image/svg+xml"),
+        ("/assets/favicon-32.png", "favicon-32.png", "image/png"),
+        ("/assets/apple-touch-icon.png", "apple-touch-icon.png", "image/png"),
+        ("/favicon.ico", "favicon.ico", "image/x-icon"),
+    )
+    with TestClient(admin.app) as client:
+        # Icons need to work for the login screen BEFORE a session exists.
+        page = client.get("/login")
+        assert page.status_code == 200
+        for route, filename, media_type in assets:
+            assert f'href="{route}"' in page.text
+            response = client.get(route)
+            assert response.status_code == 200
+            assert response.headers["content-type"].startswith(media_type)
+            assert response.content == (original_assets / filename).read_bytes()
+
+        assert "img-src 'self'" in page.headers["Content-Security-Policy"]
+        assert "default-src 'none'" in page.headers["Content-Security-Policy"]
+        assert "unsafe-inline" not in page.headers["Content-Security-Policy"]
+        assert client.get("/api/state").status_code == 401
+        assert client.get("/admin/publish", follow_redirects=False).status_code == 303
+
+        sign_in(client)
+        dashboard = client.get("/admin/publish")
+        assert dashboard.status_code == 200
+        for route, _, _ in assets:
+            assert f'href="{route}"' in dashboard.text
+        assert "img-src 'self'" in dashboard.headers["Content-Security-Policy"]
+
+    public = load("public", tmp_path, monkeypatch)
+    with TestClient(public.app) as client:
+        # Public and private roles still have DIFFERENT icons at the same URL.
+        public_icon = client.get("/assets/favicon.svg")
+        assert public_icon.status_code == 200
+        assert b"crestRed" in public_icon.content
+        assert public_icon.content != (original_assets / "favicon.svg").read_bytes()
+        for route in ("/assets/favicon-32.png", "/assets/apple-touch-icon.png",
+                      "/favicon.ico", "/api/state"):
+            assert client.get(route).status_code == 404
+        assert client.get("/login").status_code == 404

@@ -80,3 +80,7 @@ Links use explicit HTTP(S) URLs without credentials/query fragments, open extern
 The publishing dashboard and sign-in page use the same visual language as the original RXPTool Decrypt and Encrypt screens: midnight navy, soft blue ambient glows, mint/teal gradients, the original editor emblem, segmented workspace navigation, rounded panels, and responsive two-column layout. Existing guide publication, allowlist, rollback, custom public text, private navigation settings, and sign-in controls retain their IDs and behaviour.
 
 This is a stylesheet and HTML-only update, using no external assets, inline scripts, new data fields, new ports, or changed CSP rules. **The public download site keeps its Bloodsail theme unchanged.** Update the existing portal Portainer stack using `ghcr.io/zeragonii/rxptool:edge` with **Re-pull image and redeploy**.
+
+## Classic favicon on the private admin UI
+
+The publishing dashboard and login page now use the **original Decrypt/Encrypt site favicon assets** (SVG, 32px PNG, ICO, and Apple touch icon) shipped in the same Docker image. These assets are served by the admin role even before login so browsers can display the icon on the sign-in page; no editor API or admin functionality is exposed. The admin role's CSP explicitly permits same-origin image requests (`img-src 'self'`) but still denies external sources and inline scripts. The public downloads role continues using the separate Bloodsail pirate SVG favicon. No extra configuration is necessary.

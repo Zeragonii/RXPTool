@@ -50,6 +50,7 @@ SESSION_LIFETIME = 8 * 60 * 60
 _SESSION_CAP = 128
 ID_PATTERN = re.compile(r"^[^#\x00-\x1f\x7f]{1,60}#[0-9]{4,10}$")
 STATIC = Path(__file__).resolve().parent / "static"
+EDITOR_STATIC = STATIC.parent.parent / "webapp" / "static"
 LOG = logging.getLogger("rxptool.portal")
 SLOTS = threading.BoundedSemaphore(1)
 _lock = threading.Lock()
@@ -453,7 +454,8 @@ async def security(request: Request, call_next):
     # Only these endpoints are accessible before logging into the private
     # publisher. The public service has an entirely separate route table.
     login_routes = {"/health", "/login", "/assets/style.css",
-                    "/assets/login.js", "/api/login"}
+                    "/assets/login.js", "/api/login", "/assets/favicon.svg",
+                    "/assets/favicon-32.png", "/assets/apple-touch-icon.png", "/favicon.ico"}
     if ROLE == "admin" and request.url.path not in login_routes:
         if not authenticated(request):
             if request.method in {"GET", "HEAD"} and request.url.path in {"/", "/admin/publish"}:
@@ -476,8 +478,8 @@ async def security(request: Request, call_next):
         "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
         "Content-Security-Policy": (
             "default-src 'none'; style-src 'self'; script-src 'self'; "
-            + ("img-src 'self'; " if ROLE == "public" else "")
-            + "connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+            "img-src 'self'; connect-src 'self'; form-action 'self'; "
+            "frame-ancestors 'none'; base-uri 'none'"
         ),
     })
     return response
@@ -511,6 +513,25 @@ def css():
 
 
 if ROLE == "admin":
+
+    # Reuse the original editor's favicon assets from the SAME Docker image.
+    # Only these static paths are public before login; authentication and
+    # the original editor APIs are never exposed by the admin role.
+    @app.get("/assets/favicon.svg")
+    def admin_favicon_svg():
+        return FileResponse(EDITOR_STATIC / "favicon.svg", media_type="image/svg+xml")
+
+    @app.get("/assets/favicon-32.png")
+    def admin_favicon_png():
+        return FileResponse(EDITOR_STATIC / "favicon-32.png", media_type="image/png")
+
+    @app.get("/assets/apple-touch-icon.png")
+    def admin_apple_touch_icon():
+        return FileResponse(EDITOR_STATIC / "apple-touch-icon.png", media_type="image/png")
+
+    @app.get("/favicon.ico")
+    def admin_favicon_ico():
+        return FileResponse(EDITOR_STATIC / "favicon.ico", media_type="image/x-icon")
 
     @app.get("/login")
     def login_page(request: Request):
