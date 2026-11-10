@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import re
 import sqlite3
 from pathlib import Path
 
@@ -83,6 +84,10 @@ def test_publisher_and_public_are_separate(tmp_path, monkeypatch):
         result = c.post("/api/download", json={"battle_id": "PortalTest#1234"})
         assert result.status_code == 200, result.text
         assert result.headers["X-Package-Verified"] == "true"
+        assert re.fullmatch(
+            r'attachment; filename="RXPTool!PortalTest#1234_20\\d{2}-\\d{2}-\\d{2}_\\d{2}-\\d{2}\\.txt"',
+            result.headers["Content-Disposition"],
+        )
         output = result.content.decode()
         perm = initial_permutation(derive_base("PortalTest#1234"))
         assert [decode_chunk(chunk, perm, 16 * 1024 * 1024)
@@ -241,3 +246,27 @@ def test_public_pirate_design_preserves_dynamic_copy_and_download_contract(tmp_p
         assert "public-download-page" in css.text
         assert "public-deck" in css.text
         assert client.get("/api/state").status_code == 404
+
+
+def test_public_download_filename_supports_unicode_battletags(tmp_path, monkeypatch):
+    from urllib.parse import unquote
+
+    admin = load("admin", tmp_path, monkeypatch)
+    with TestClient(admin.app) as a:
+        headers = sign_in(a)
+        assert a.post("/api/allowlist/add",
+                      json={"battle_id": "Piratañ#1234"}, headers=headers).status_code == 200
+        assert a.post("/api/publish", content=DOCUMENT,
+                      headers={**headers, "Content-Type": "application/octet-stream"}).status_code == 200
+
+    public = load("public", tmp_path, monkeypatch)
+    with TestClient(public.app) as c:
+        result = c.post("/api/download", json={"battle_id": "Piratañ#1234"})
+        assert result.status_code == 200, result.text
+        disposition = result.headers["Content-Disposition"]
+        assert "filename*=UTF-8''" in disposition
+        extended = disposition.split("filename*=UTF-8''", 1)[1]
+        assert re.fullmatch(
+            r'RXPTool!Piratañ#1234_20\\d{2}-\\d{2}-\\d{2}_\\d{2}-\\d{2}\\.txt',
+            unquote(extended),
+        )
