@@ -263,3 +263,28 @@ def test_invalid_source_metadata_is_rejected_not_silently_ignored():
     out = encrypt_doc(broken)
     assert out.status_code == 422, out.text
     assert 'Invalid #!source_name' in out.text
+
+
+def test_optional_editor_to_publisher_navigation_is_explicit_and_safe(monkeypatch):
+    monkeypatch.delenv("RXP_PORTAL_ADMIN_URL", raising=False)
+    for route in ("/", "/encrypt"):
+        response = client.get(route)
+        assert response.status_code == 200
+        assert "{{RXP_PUBLISHER_LINK}}" not in response.text
+        assert ">Publishing</a>" not in response.text
+
+    destination = "http://192.168.1.20:8788/admin/publish"
+    monkeypatch.setenv("RXP_PORTAL_ADMIN_URL", destination)
+    for route in ("/", "/encrypt"):
+        response = client.get(route)
+        assert response.status_code == 200
+        assert f'href="{destination}"' in response.text
+        assert 'rel="noopener noreferrer"' in response.text
+        assert ">Publishing</a>" in response.text
+
+    for unsafe in ("javascript:alert(1)", "https://evil.example/?next=javascript:alert(1)",
+                   "https://example.com@evil.example/secret", "https://example.com/#secret",
+                   "https://admin.example/extra", "not-a-url"):
+        monkeypatch.setenv("RXP_PORTAL_ADMIN_URL", unsafe)
+        assert ">Publishing</a>" not in client.get("/").text
+        assert ">Publishing</a>" not in client.get("/encrypt").text
