@@ -85,7 +85,7 @@ def test_publisher_and_public_are_separate(tmp_path, monkeypatch):
         assert result.status_code == 200, result.text
         assert result.headers["X-Package-Verified"] == "true"
         assert re.fullmatch(
-            r'attachment; filename="RXPTool!PortalTest#1234_20\\d{2}-\\d{2}-\\d{2}_\\d{2}-\\d{2}\\.txt"',
+            r'attachment; filename="RXPTool!PortalTest#1234_20\d{2}-\d{2}-\d{2}_\d{2}-\d{2}\.txt"',
             result.headers["Content-Disposition"],
         )
         output = result.content.decode()
@@ -267,6 +267,6 @@ def test_public_download_filename_supports_unicode_battletags(tmp_path, monkeypa
         assert "filename*=UTF-8''" in disposition
         extended = disposition.split("filename*=UTF-8''", 1)[1]
         assert re.fullmatch(
-            r'RXPTool!Piratañ#1234_20\\d{2}-\\d{2}-\\d{2}_\\d{2}-\\d{2}\\.txt',
+            r'RXPTool!Piratañ#1234_20\d{2}-\d{2}-\d{2}_\d{2}-\d{2}\.txt',
             unquote(extended),
         )
