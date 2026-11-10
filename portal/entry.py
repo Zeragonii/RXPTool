@@ -27,7 +27,6 @@ from fastapi.concurrency import run_in_threadpool
 from rxp_decrypt import decode_chunk, derive_base, extract_chunks, initial_permutation
 from webapp.editable_document import (
     DocumentError, is_editable_document, rebuild_from_editable_document,
-    source_name_from_editable_document,
 )
 from webapp.download_names import content_disposition, encrypted_filename
 
@@ -551,9 +550,10 @@ else:
                 return error(503, "No guide has been published")
             data = bytes(row[0])
             encoded = await run_in_threadpool(encode, data, approved)
-            source = source_name_from_editable_document(data) or "RXPGuide"
-            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
-            name = encrypted_filename(source, approved, timestamp)
+            # Keep filenames consistent regardless of the uploaded guide's source name.
+            # The shared helper preserves BattleTags (# included), escapes invalid
+            # Windows filename characters, and uses a UTC date/time suffix.
+            name = encrypted_filename("RXPTool", approved)
             return Response(encoded, media_type="application/octet-stream", headers={
                 "Content-Disposition": content_disposition(name),
                 "X-Import-Rebuilt": "true",
