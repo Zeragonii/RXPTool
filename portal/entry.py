@@ -512,6 +512,10 @@ if ROLE == "admin":
 
 else:
 
+    @app.get("/assets/favicon.svg")
+    def public_favicon():
+        return FileResponse(STATIC / "favicon.svg", media_type="image/svg+xml")
+
     @app.get("/assets/download.js")
     def public_script():
         return FileResponse(STATIC / "download.js", media_type="application/javascript")
