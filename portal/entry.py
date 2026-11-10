@@ -369,7 +369,8 @@ async def security(request: Request, call_next):
         "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
         "Content-Security-Policy": (
             "default-src 'none'; style-src 'self'; script-src 'self'; "
-            "connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+            + ("img-src 'self'; " if ROLE == "public" else "")
+            + "connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
         ),
     })
     return response
