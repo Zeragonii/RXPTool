@@ -311,3 +311,31 @@ body.public-download-page::before {
   .public-download-page .public-form button { transition: none; }
   .public-download-page .public-form button:hover { transform: none; }
 }
+
+/* Public guide freshness indicator, beneath the editable page message. */
+.public-download-page .guide-freshness {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  max-width: 100%;
+  margin: 20px auto 0;
+  padding: 9px 15px;
+  border: 1px solid rgba(202, 154, 92, .34);
+  border-radius: 100px;
+  background: rgba(92, 22, 32, .28);
+  color: #dbc09b;
+  font-size: .78rem;
+  line-height: 1.55;
+  text-align: center;
+}
+.public-download-page .guide-freshness-icon {
+  color: #d7a66b;
+  font-size: .72rem;
+  flex: none;
+}
+.public-download-page .guide-freshness time {
+  color: #f4ddb4;
+  font-weight: 700;
+  white-space: nowrap;
+}
