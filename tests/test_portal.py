@@ -241,6 +241,15 @@ def test_public_pirate_design_preserves_dynamic_copy_and_download_contract(tmp_p
         assert 'id="submit"' in response.text
         assert 'id="status"' in response.text
         assert '/assets/download.js' in response.text
+        assert '<link rel="icon" type="image/svg+xml" sizes="any" href="/assets/favicon.svg">' in response.text
+        favicon = client.get("/assets/favicon.svg")
+        assert favicon.status_code == 200
+        assert favicon.headers["content-type"].startswith("image/svg+xml")
+        assert '<svg' in favicon.text
+        assert 'id="crestGold"' in favicon.text
+        assert 'id="crestRed"' in favicon.text
+        assert "crossed cutlasses" in favicon.text
+        assert client.get("/assets/favicon.png").status_code == 404
         css = client.get("/assets/style.css")
         assert css.status_code == 200
         assert "public-download-page" in css.text
