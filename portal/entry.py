@@ -19,6 +19,7 @@ import time
 from collections import defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
@@ -222,11 +223,64 @@ def save_public_page_settings(data: dict) -> dict[str, str]:
     return values
 
 
+
+def navigation_settings() -> dict[str, str]:
+    """Navigation is private and never returned from the public role."""
+    values = {"editor_url": "", "public_url": ""}
+    with dbconnect() as db:
+        for row in db.execute(
+            "SELECT name, value FROM page_settings "
+            "WHERE name IN ('navigation_editor_url', 'navigation_public_url')"
+        ):
+            values[row["name"].removeprefix("navigation_")] = row["value"]
+    return values
+
+
+def validate_navigation_url(value: object, field: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must be a URL")
+    value = value.strip()
+    if not value:
+        return ""
+    if len(value) > 512 or any(char.isspace() or ord(char) < 32 for char in value):
+        raise ValueError(f"{field} contains unsupported characters")
+    try:
+        parsed = urlsplit(value)
+        if (parsed.scheme not in {"http", "https"}
+                or not parsed.hostname or parsed.username is not None
+                or parsed.password is not None or parsed.query or parsed.fragment
+                or parsed.port is not None and not 1 <= parsed.port <= 65535):
+            raise ValueError()
+    except ValueError:
+        raise ValueError(f"{field} must be a normal http(s) address, without credentials or query strings") from None
+    # These are navigation destinations, not a general-purpose URL proxy.
+    if field == "editor_url":
+        if parsed.path not in {"", "/"}:
+            raise ValueError("Editor URL should be its root address, e.g. https://editor.example")
+        return value.rstrip("/")
+    if parsed.path not in {"", "/", "/download", "/download/"}:
+        raise ValueError("Public URL should be its root address or /download")
+    return value[:len(value) - len(parsed.path)] + "/download"
+
+
+def save_navigation_settings(data: dict) -> dict[str, str]:
+    values = {field: validate_navigation_url(data.get(field), field)
+              for field in ("editor_url", "public_url")}
+    with dbconnect() as db:
+        db.executemany(
+            "INSERT INTO page_settings (name, value) VALUES (?, ?) "
+            "ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+            [("navigation_" + field, value) for field, value in values.items()],
+        )
+    return values
+
+
 def state() -> dict:
     with dbconnect() as db:
         return {
             "current": metadata(),
             "public_page": get_public_page_settings(),
+            "navigation": navigation_settings(),
             "allowlist": [row[0] for row in db.execute(
                 "SELECT battle_id FROM approved ORDER BY battle_id COLLATE NOCASE"
             )],
@@ -506,6 +560,10 @@ if ROLE == "admin":
     def settings_script():
         return FileResponse(STATIC / "settings.js", media_type="application/javascript")
 
+    @app.get("/assets/navigation.js")
+    def navigation_script():
+        return FileResponse(STATIC / "navigation.js", media_type="application/javascript")
+
     @app.get("/api/state")
     def admin_state():
         return state()
@@ -517,6 +575,16 @@ if ROLE == "admin":
         try:
             values = save_public_page_settings(await body_json(request, maxlen=16384))
             return {"public_page": values}
+        except ValueError as exc:
+            return error(400, str(exc))
+
+    @app.post("/api/settings/navigation")
+    async def update_navigation(request: Request):
+        if not limit("admin-navigation:" + (request.client.host if request.client else "unknown"), 30):
+            return error(429, "Too many navigation updates")
+        try:
+            values = save_navigation_settings(await body_json(request, maxlen=4096))
+            return {"navigation": values}
         except ValueError as exc:
             return error(400, str(exc))
 

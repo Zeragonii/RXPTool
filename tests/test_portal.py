@@ -372,3 +372,76 @@ def test_publication_age_is_live_and_uses_existing_published_timestamp(tmp_path,
     public = load("public", tmp_path, monkeypatch)
     with TestClient(public.app) as client:
         assert "just now</time>" in client.get("/download").text
+
+
+def test_private_workspace_links_persist_and_public_cannot_access_them(tmp_path, monkeypatch):
+    admin = load("admin", tmp_path, monkeypatch)
+    with TestClient(admin.app) as client:
+        assert client.get("/api/state").status_code == 401
+        assert client.post("/api/settings/navigation",
+                           json={"editor_url": "http://editor.lan:8787",
+                                 "public_url": "https://rxp.dynastic-host.com/download"},
+                           headers={"X-RXP-Admin": "1"}).status_code == 401
+
+        headers = sign_in(client)
+        page = client.get("/admin/publish")
+        assert page.status_code == 200
+        assert 'id="nav-decrypt"' in page.text
+        assert 'id="nav-encrypt"' in page.text
+        assert 'id="nav-public"' in page.text
+        assert '/assets/navigation.js' in page.text
+        assert client.get("/assets/navigation.js").status_code == 200
+        assert client.get("/api/state").json()["navigation"] == {
+            "editor_url": "", "public_url": ""
+        }
+
+        endpoint = "/api/settings/navigation"
+        links = {
+            "editor_url": "http://editor.lan:8787/",
+            "public_url": "https://rxp.dynastic-host.com/download/"
+        }
+        assert client.post(endpoint, json=links).status_code == 403
+        assert client.post(endpoint, json=links, headers={
+            **headers, "Origin": "https://evil.example"
+        }).status_code == 403
+        unsafe = [
+            {"editor_url": "javascript:alert(1)", "public_url": ""},
+            {"editor_url": "https://user:password@example.com", "public_url": ""},
+            {"editor_url": "https://editor.example/extra", "public_url": ""},
+            {"editor_url": "https://example.com/?token=secret", "public_url": ""},
+            {"editor_url": "https://editor.example", "public_url": "data:text/html,X"},
+            {"editor_url": "https://editor.example", "public_url": "https://example.com/admin/publish"},
+            {"editor_url": "https://editor.example", "public_url": "https://example.com/download#fragment"},
+        ]
+        for invalid in unsafe:
+            response = client.post(endpoint, json=invalid, headers=headers)
+            assert response.status_code == 400, (invalid, response.text)
+
+        response = client.post(endpoint, json=links, headers=headers)
+        assert response.status_code == 200, response.text
+        assert response.json()["navigation"] == {
+            "editor_url": "http://editor.lan:8787",
+            "public_url": "https://rxp.dynastic-host.com/download"
+        }
+        state = client.get("/api/state").json()
+        assert state["navigation"] == response.json()["navigation"]
+        assert state["current"] is None
+
+    public = load("public", tmp_path, monkeypatch)
+    with TestClient(public.app) as client:
+        page = client.get("/download")
+        assert page.status_code == 200
+        assert "editor.lan" not in page.text
+        assert "rxp.dynastic-host.com" not in page.text
+        assert client.get("/assets/navigation.js").status_code == 404
+        assert client.get("/api/settings/navigation").status_code == 404
+        assert client.post("/api/settings/navigation", json=links).status_code == 404
+
+    admin = load("admin", tmp_path, monkeypatch)
+    with TestClient(admin.app) as client:
+        sign_in(client)
+        assert client.get("/api/state").json()["navigation"] == state["navigation"]
+        clear = client.post(endpoint, headers={"X-RXP-Admin": "1"},
+                            json={"editor_url": "", "public_url": ""})
+        assert clear.status_code == 200
+        assert clear.json()["navigation"] == {"editor_url": "", "public_url": ""}

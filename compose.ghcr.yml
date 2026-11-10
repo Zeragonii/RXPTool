@@ -12,6 +12,7 @@ services:
       RXP_USERNAME: ${RXP_USERNAME:-}
       RXP_PASSWORD: ${RXP_PASSWORD:-}
       RXP_HEADLINE: ${RXP_HEADLINE:-Guides, unlocked into plaintext.}
+      RXP_PORTAL_ADMIN_URL: ${RXP_PORTAL_ADMIN_URL:-}
     read_only: true
     tmpfs:
       - /tmp:size=32m,mode=1777

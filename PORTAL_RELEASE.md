@@ -66,3 +66,11 @@ All public guide downloads are named consistently as `RXPTool!BattleTag#1234_YYY
 The public Privateer's Cache page shows a gold-accented **Guide last updated ... ago** label beneath the configurable description. It derives from the existing UTC `publication.published_at` timestamp in the SQLite volume, recorded on each successful upload (and refreshed when a version is restored).
 
 The label shows just now, minutes, hours, days, weeks, months or years as appropriate, with the exact publication date and UTC time available on hover. The relative age is recalculated on every public page load; no new API endpoints, JavaScript, configuration, or database migration are required. Before the first publication the page shows **Awaiting first guide publication**.
+
+## Private workspace navigation
+
+The publisher's private **Publishing** dashboard now includes navigation to the original **Decrypt** and **Encrypt** pages and the public **Downloads** page. In **Workspace links**, save the URL of your original editor (e.g. `http://LAN-SERVER:8787`) and the public site (e.g. `https://rxp.example.com/download`). These links are stored privately in the existing SQLite volume and require no Portainer changes. The public downloader does **not** expose the editor URL or private publisher dashboard.
+
+For a return link **from the original editor** to the publisher, optionally set `RXP_PORTAL_ADMIN_URL=http://PRIVATE-SERVER:8788/admin/publish` in the **original editor stack**, then update that original stack with an image that includes this feature (currently the `:edge` image). Both Decrypt and Encrypt show a **Publishing** tab only when this is configured. The link opens a separate tab and is not an authentication shortcut. Do not set this on an internet-facing editor if you want to keep the private dashboard hostname/address undisclosed. **Never expose the publisher's port publicly** merely to make a link work: browser access to that private host over LAN/VPN is still required.
+
+Links use explicit HTTP(S) URLs without credentials/query fragments, open external destinations with `noopener noreferrer`, and leave existing user authentication, session cookies, permissions and routing intact. The public downloads page does not gain an admin link.

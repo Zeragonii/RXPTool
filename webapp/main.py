@@ -10,6 +10,7 @@ import secrets
 import threading
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
@@ -97,9 +98,34 @@ async def health():
     return {'status': 'ok', 'version': VERSION}
 
 
+def publisher_navigation_link() -> str:
+    """Optional original-editor link to the private publisher.
+
+    Never render this link by default: the editor might be publicly reachable,
+    and its operator may not want to disclose their private dashboard address.
+    """
+    address = os.environ.get("RXP_PORTAL_ADMIN_URL", "").strip()
+    if not address or len(address) > 512 or any(c.isspace() or ord(c) < 32 for c in address):
+        return ""
+    try:
+        parsed = urlsplit(address)
+        if (parsed.scheme not in {"http", "https"} or not parsed.hostname
+                or parsed.username is not None or parsed.password is not None
+                or parsed.query or parsed.fragment
+                or parsed.path not in {"", "/", "/admin/publish", "/admin/publish/"}
+                or parsed.port is not None and not 1 <= parsed.port <= 65535):
+            return ""
+    except ValueError:
+        return ""
+    destination = address[:len(address) - len(parsed.path)] + "/admin/publish"
+    return ('<a class="nav-link" href="' + html.escape(destination, quote=True)
+            + '" target="_blank" rel="noopener noreferrer">Publishing</a>')
+
+
 def render_page(name: str) -> Response:
     template = (STATIC / name).read_text('utf-8')
-    content = template.replace('{{RXP_HEADLINE}}', html.escape(HEADLINE, quote=True))
+    content = (template.replace('{{RXP_HEADLINE}}', html.escape(HEADLINE, quote=True))
+                       .replace('{{RXP_PUBLISHER_LINK}}', publisher_navigation_link()))
     return Response(content, media_type='text/html; charset=utf-8')
 
 
