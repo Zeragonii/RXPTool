@@ -56,3 +56,7 @@ From the **private publisher** at `/admin/publish`, find the **Public downloads 
 - Headline accepts 1–160 characters on one line. Message accepts 1–1000 characters and line breaks.
 - These fields accept *plain text only*, with HTML escaped when the public page is rendered. They cannot inject scripts, links or HTML markup.
 - Changing these values affects **only the public downloads page**. The admin login, original Decrypt and Encrypt screens, guide contents, and public-download security restrictions are unchanged.
+
+## Public download filenames
+
+All public guide downloads are named consistently as `RXPTool!BattleTag#1234_YYYY-MM-DD_HH-MM.txt` (UTC). The uploaded guide's original filename does not affect the download name. This uses the original editor's safe Windows filename and Content-Disposition logic, preserves the # in BattleTags, and supports Unicode BattleTags in browsers. The encrypted guide content is unchanged.
