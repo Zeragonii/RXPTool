@@ -874,3 +874,27 @@ body.publisher-login {
   .publisher-admin button:hover:not(:disabled),
   .publisher-login button:hover:not(:disabled) { transform: none; }
 }
+
+/* Keep long allowlists inside the access-control card, not the whole page. */
+.publisher-admin #ids {
+  max-height: clamp(180px, 45vh, 360px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #4a7181 #0d1a2a;
+  scrollbar-gutter: stable;
+  padding-right: 8px;
+}
+.publisher-admin #ids:focus-visible {
+  outline: 2px solid var(--work-teal);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+.publisher-admin #ids::-webkit-scrollbar { width: 9px; }
+.publisher-admin #ids::-webkit-scrollbar-track { background: #0d1a2a; border-radius: 9px; }
+.publisher-admin #ids::-webkit-scrollbar-thumb {
+  background: #426c7c;
+  border: 2px solid #0d1a2a;
+  border-radius: 9px;
+}
+.publisher-admin #ids::-webkit-scrollbar-thumb:hover { background: #5b9aab; }
