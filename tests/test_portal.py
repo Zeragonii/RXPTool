@@ -564,3 +564,37 @@ def test_private_admin_uses_exact_classic_editor_favicon_assets(tmp_path, monkey
                       "/favicon.ico", "/api/state"):
             assert client.get(route).status_code == 404
         assert client.get("/login").status_code == 404
+
+
+def test_approved_accounts_list_scrolls_independently(tmp_path, monkeypatch):
+    # Styling is confined to the private admin account list; changing this
+    # should not give the public portal a scrollbar or change any JS hooks.
+    admin = load("admin", tmp_path, monkeypatch)
+    with TestClient(admin.app) as client:
+        assert client.get("/admin/publish", follow_redirects=False).status_code == 303
+        sign_in(client)
+        page = client.get("/admin/publish")
+        assert page.status_code == 200
+        assert 'id="ids" class="publisher-list" aria-label="Approved accounts" tabindex="0"' in page.text
+        assert 'id="add"' in page.text
+        assert 'id="id"' in page.text
+        assert 'id="history"' in page.text
+        stylesheet = client.get("/assets/style.css").text
+        assert ".publisher-admin #ids {" in stylesheet
+        assert "overflow-y: auto;" in stylesheet
+        assert "max-height: clamp(180px, 45vh, 360px);" in stylesheet
+        assert ".publisher-admin #ids:focus-visible" in stylesheet
+
+        # API/allowlist remains functional, without truncating stored entries.
+        for i in range(18):
+            result = client.post("/api/allowlist/add",
+                                 json={"battle_id": f"TestCrew{i}#1234"},
+                                 headers={"X-RXP-Admin": "1"})
+            assert result.status_code == 200, result.text
+        state = client.get("/api/state").json()
+        assert len(state["allowlist"]) == 18
+
+    public = load("public", tmp_path, monkeypatch)
+    with TestClient(public.app) as client:
+        assert client.get("/api/state").status_code == 404
+        assert 'id="ids"' not in client.get("/download").text
