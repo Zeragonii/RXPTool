@@ -30,11 +30,13 @@ from webapp.editable_document import (
     DocumentError, is_editable_document, rebuild_from_editable_document,
 )
 from webapp.download_names import content_disposition, encrypted_filename
+from portal import analytics
 
 ROLE = os.environ.get("RXP_PORTAL_ROLE", "").strip().lower()
 if ROLE not in {"admin", "public"}:
     raise RuntimeError("Set RXP_PORTAL_ROLE to admin or public")
 DB = Path(os.environ.get("RXP_PORTAL_DB", "/data/portal.sqlite3"))
+ANALYTICS_DB = Path(os.environ.get("RXP_PORTAL_ANALYTICS_DB", "/telemetry/traffic.sqlite3"))
 MAX_GUIDE = 16 * 1024 * 1024
 MAX_OUTPUT = 24 * 1024 * 1024
 PUBLIC_HEADLINE_DEFAULT = "Your guide, ready to import."
@@ -118,6 +120,43 @@ if ROLE == "admin":
 else:
     if not DB.is_file():
         raise RuntimeError("Publishing database does not exist; start admin first")
+
+# Tracking is isolated from the guide/allowlist database. Missing telemetry
+# volume must never prevent the public downloader from serving guides.
+ANALYTICS_READY = False
+if ROLE == "public":
+    if ANALYTICS_DB.parent.is_dir():
+        try:
+            analytics.initialize(ANALYTICS_DB)
+            ANALYTICS_READY = True
+        except (OSError, sqlite3.Error):
+            LOG.warning("Analytics storage unavailable; downloads remain operational")
+    else:
+        LOG.warning("Analytics volume not mounted; update portainer-portal-stack.yml")
+
+
+def track_visit(request: Request) -> None:
+    if not ANALYTICS_READY:
+        return
+    try:
+        analytics.record_pageview(
+            ANALYTICS_DB, referer=request.headers.get("referer", ""),
+            site_hostname=request.url.hostname,
+        )
+    except (OSError, sqlite3.Error):
+        if limit("analytics-error", 1, period=60):
+            LOG.warning("Could not record public page view")
+
+
+def track_download(outcome: str, battle_id: str | None = None) -> None:
+    if not ANALYTICS_READY:
+        return
+    try:
+        analytics.record_download(ANALYTICS_DB, outcome=outcome, battle_id=battle_id)
+    except (OSError, sqlite3.Error):
+        if limit("analytics-error", 1, period=60):
+            LOG.warning("Could not record download metrics")
+
 
 
 def metadata() -> dict | None:
@@ -496,10 +535,11 @@ def health():
 
 @app.get("/")
 @app.get("/download" if ROLE == "public" else "/admin/publish")
-def home():
+def home(request: Request):
     if ROLE == "admin":
         return FileResponse(STATIC / "admin.html", media_type="text/html")
     values = get_public_page_settings()
+    track_visit(request)
     template = (STATIC / "download.html").read_text(encoding="utf-8")
     content = (template.replace("{{PUBLIC_LAST_UPDATED}}", public_publication_status())
                        .replace("{{PUBLIC_HEADLINE}}", html.escape(values["headline"], quote=True))
@@ -588,6 +628,16 @@ if ROLE == "admin":
     @app.get("/api/state")
     def admin_state():
         return state()
+
+    @app.get("/api/analytics")
+    def admin_analytics():
+        try:
+            with dbconnect() as db:
+                approved_keys = {row[0] for row in db.execute("SELECT id_key FROM approved")}
+            return analytics.snapshot(ANALYTICS_DB, approved_keys)
+        except (sqlite3.Error, OSError):
+            LOG.exception("Admin analytics unavailable")
+            return error(503, "Traffic statistics temporarily unavailable")
 
     @app.post("/api/settings/public-page")
     async def update_public_page(request: Request):
@@ -691,10 +741,12 @@ else:
         try:
             approved = allowed(requested)
             if approved is None:
+                track_download("denied", requested)
                 return error(404, "No guide available for this ID")
             with dbconnect() as db:
                 row = db.execute("SELECT guide FROM publication WHERE singleton=1").fetchone()
             if not row:
+                track_download("other")
                 return error(503, "No guide has been published")
             data = bytes(row[0])
             encoded = await run_in_threadpool(encode, data, approved)
@@ -702,14 +754,17 @@ else:
             # The shared helper preserves BattleTags (# included), escapes invalid
             # Windows filename characters, and uses a UTC date/time suffix.
             name = encrypted_filename("RXPTool", approved)
+            track_download("success")
             return Response(encoded, media_type="application/octet-stream", headers={
                 "Content-Disposition": content_disposition(name),
                 "X-Import-Rebuilt": "true",
                 "X-Package-Verified": "true",
             })
         except (DocumentError, ValueError):
+            track_download("other")
             return error(503, "Guide could not be generated")
         except Exception:
+            track_download("other")
             LOG.exception("Public guide operation failed")
             return error(503, "Guide temporarily unavailable")
         finally:
