@@ -13,8 +13,10 @@ services:
       RXP_PORTAL_ADMIN_USER: ${RXP_PORTAL_ADMIN_USER:?Set the private admin username}
       RXP_PORTAL_ADMIN_PASSWORD: ${RXP_PORTAL_ADMIN_PASSWORD:?Set a unique 20+ character password}
       RXP_PORTAL_DB: /data/portal.sqlite3
+      RXP_PORTAL_ANALYTICS_DB: /telemetry/traffic.sqlite3
     volumes:
       - portal_data:/data
+      - analytics_data:/telemetry:ro
     read_only: true
     tmpfs:
       - /tmp:size=32m,mode=1777
@@ -36,11 +38,13 @@ services:
     environment:
       RXP_PORTAL_ROLE: public
       RXP_PORTAL_DB: /data/portal.sqlite3
+      RXP_PORTAL_ANALYTICS_DB: /telemetry/traffic.sqlite3
     depends_on:
       rxptool-publisher:
         condition: service_healthy
     volumes:
       - portal_data:/data:ro
+      - analytics_data:/telemetry
     networks: [proxy]
     read_only: true
     tmpfs:
@@ -58,6 +62,8 @@ services:
 volumes:
   portal_data:
     name: rxptool_portal_data
+  analytics_data:
+    name: rxptool_analytics_data
 networks:
   proxy:
     external: true
