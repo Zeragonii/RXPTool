@@ -6,6 +6,8 @@ Self-hosted, account-keyed RestedXP import editor and controlled public guide do
 
 A private session-login guide publishing dashboard and a standalone public download portal can be deployed as two additional services from the same GHCR image. Public users enter an approved Battle.net ID and receive the latest guide encrypted for that account. The existing editor routes remain private. The publisher can also edit the public page's headline and message live, with changes stored in the existing volume. It has private configurable workspace links to the original editor and public downloads; an optional editor-to-publisher link can be explicitly enabled without publishing the private admin URL on the public portal. The public downloader now uses an original Bloodsail-inspired crimson, gold and parchment pirate design (admin and editor styling unchanged). See [PORTAL_RELEASE.md](PORTAL_RELEASE.md) for Portainer deployment and security details.
 
+The private publishing dashboard also includes 90-day traffic statistics and a separate list of **unapproved Battle.net IDs** used in denied download attempts. This uses a dedicated read-only-to-admin, writable-to-public analytics volume, introduced in the latest `portainer-portal-stack.yml`. See `PORTAL_RELEASE.md` for the required stack update, retention and privacy details.
+
 ## Workflow
 
 1. **Decrypt** (`/`): upload/paste the original, complete encrypted import and enter the matching account ID. Download **`<original filename before !>.txt`** (or `editable_guides.txt` when pasting).
