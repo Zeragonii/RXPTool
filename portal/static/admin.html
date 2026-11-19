@@ -14,6 +14,7 @@
   <script src="/assets/admin.js" defer></script>
   <script src="/assets/settings.js" defer></script>
   <script src="/assets/navigation.js" defer></script>
+  <script src="/assets/analytics.js" defer></script>
 </head>
 <body class="publisher-admin">
   <div class="publisher-ambient publisher-ambient-blue" aria-hidden="true"></div>
@@ -48,7 +49,7 @@
       <div class="publisher-grid">
         <div class="publisher-column">
           <section class="panel publisher-panel" aria-labelledby="publication-title">
-            <div class="publisher-panel-heading"><div><span class="publisher-overline">PUBLICATION CONTROL</span><h2 id="publication-title">Latest published guide</h2></div><span class="publisher-counter">01 / 05</span></div>
+            <div class="publisher-panel-heading"><div><span class="publisher-overline">PUBLICATION CONTROL</span><h2 id="publication-title">Latest published guide</h2></div><span class="publisher-counter">01 / 07</span></div>
             <div class="publisher-info-box"><span class="publisher-small-label">CURRENT RELEASE</span><p id="publication" aria-live="polite">Loading…</p></div>
             <form id="publish">
               <label for="guide">Publish an editable guide TXT</label>
@@ -59,14 +60,21 @@
           </section>
 
           <section class="panel publisher-panel" aria-labelledby="allowlist-title">
-            <div class="publisher-panel-heading"><div><span class="publisher-overline">ACCESS CONTROL</span><h2 id="allowlist-title">Approved Battle.net IDs</h2></div><span class="publisher-counter">02 / 05</span></div>
+            <div class="publisher-panel-heading"><div><span class="publisher-overline">ACCESS CONTROL</span><h2 id="allowlist-title">Approved Battle.net IDs</h2></div><span class="publisher-counter">02 / 07</span></div>
             <p class="muted publisher-panel-description">Only IDs on this list can request account-specific encrypted guide downloads.</p>
             <form id="add"><label for="id">Battle.net ID</label><div class="controls"><input id="id" placeholder="YourName#1234" maxlength="128" required><button type="submit">Add ID</button></div></form>
             <ul id="ids" class="publisher-list" aria-label="Approved accounts" tabindex="0"></ul>
           </section>
 
+          <section class="panel publisher-panel" id="unapproved-requests" aria-labelledby="unapproved-title">
+            <div class="publisher-panel-heading"><div><span class="publisher-overline">UNAPPROVED DOWNLOAD ATTEMPTS</span><h2 id="unapproved-title">Unknown Battle.net IDs</h2></div><span class="publisher-counter">03 / 07</span></div>
+            <p class="muted publisher-panel-description">IDs submitted to the download form that were not on the whitelist. This is an attempt log, not proof of a particular person or community.</p>
+            <p id="unapproved-summary" class="traffic-help" aria-live="polite">Loading recent attempts…</p>
+            <ul id="unapproved-ids" class="publisher-list traffic-unknown-list" tabindex="0" aria-label="Unapproved download attempts"></ul>
+          </section>
+
           <section class="panel publisher-panel" aria-labelledby="rollback-title">
-            <div class="publisher-panel-heading"><div><span class="publisher-overline">RELEASE HISTORY</span><h2 id="rollback-title">Rollback history</h2></div><span class="publisher-counter">03 / 05</span></div>
+            <div class="publisher-panel-heading"><div><span class="publisher-overline">RELEASE HISTORY</span><h2 id="rollback-title">Rollback history</h2></div><span class="publisher-counter">04 / 07</span></div>
             <p class="muted publisher-panel-description">Your last three releases are retained. Restore an earlier guide without uploading it again.</p>
             <ul id="history" class="publisher-list" aria-label="Previous guide versions"></ul>
           </section>
@@ -74,7 +82,7 @@
 
         <div class="publisher-column">
           <section class="panel publisher-panel" id="public-page-settings" aria-labelledby="public-page-title">
-            <div class="publisher-panel-heading"><div><span class="publisher-overline">PUBLIC PRESENTATION</span><h2 id="public-page-title">Public downloads page</h2></div><span class="publisher-counter">04 / 05</span></div>
+            <div class="publisher-panel-heading"><div><span class="publisher-overline">PUBLIC PRESENTATION</span><h2 id="public-page-title">Public downloads page</h2></div><span class="publisher-counter">05 / 07</span></div>
             <p class="muted publisher-panel-description">Edit what visitors see at the Privateer's Cache. Save instantly, without redeploying or republishing a guide.</p>
             <form id="public-page-form">
               <label for="public-headline">Page headline</label>
@@ -88,7 +96,7 @@
           </section>
 
           <section class="panel publisher-panel" id="navigation-settings" aria-labelledby="navigation-title">
-            <div class="publisher-panel-heading"><div><span class="publisher-overline">WORKSPACE CONNECTIONS</span><h2 id="navigation-title">Workspace links</h2></div><span class="publisher-counter">05 / 05</span></div>
+            <div class="publisher-panel-heading"><div><span class="publisher-overline">WORKSPACE CONNECTIONS</span><h2 id="navigation-title">Workspace links</h2></div><span class="publisher-counter">06 / 07</span></div>
             <p class="muted publisher-panel-description">Connect your existing editor and public download URLs. Links are visible only in this private dashboard.</p>
             <form id="navigation-form">
               <label for="editor-url">Original editor address</label>
@@ -98,6 +106,26 @@
               <button id="navigation-save" type="submit">Save navigation links <span aria-hidden="true">↗</span></button>
             </form>
             <p id="navigation-status" class="status" role="status" aria-live="polite"></p>
+          </section>
+
+          <section class="panel publisher-panel" id="traffic-stats" aria-labelledby="traffic-title">
+            <div class="publisher-panel-heading"><div><span class="publisher-overline">PRIVATE TRAFFIC INTELLIGENCE</span><h2 id="traffic-title">Download activity</h2></div><span class="publisher-counter">07 / 07</span></div>
+            <p class="muted publisher-panel-description">Daily visits and actual download requests, counted from when tracking was deployed. Statistics use UTC days and retain up to 90 days.</p>
+            <div class="traffic-stat-grid">
+              <div><span>PAGE VIEWS TODAY</span><strong id="traffic-today-views">—</strong></div>
+              <div><span>PAGE VIEWS · 7 DAYS</span><strong id="traffic-week-views">—</strong></div>
+              <div><span>PAGE VIEWS · 30 DAYS</span><strong id="traffic-month-views">—</strong></div>
+              <div><span>DOWNLOADS · 30 DAYS</span><strong id="traffic-month-successes">—</strong></div>
+              <div><span>DENIED · 30 DAYS</span><strong id="traffic-month-denials">—</strong></div>
+              <div><span>REQUESTS · 30 DAYS</span><strong id="traffic-month-requests">—</strong></div>
+            </div>
+            <div class="traffic-section-title">Recent daily activity <span>(views · downloads · denied)</span></div>
+            <ul id="traffic-daily" class="traffic-daily" aria-label="Daily traffic statistics"></ul>
+            <div class="traffic-section-title">Referring websites <span>(last 30 days)</span></div>
+            <ul id="traffic-referrers" class="traffic-daily" aria-label="Referring website domains"></ul>
+            <p class="traffic-help">Referrers may be missing or spoofed. Visits aren't unique people; bots and refreshes can count too. IP addresses are not stored.</p>
+            <button id="traffic-refresh" type="button" class="traffic-refresh">Refresh activity</button>
+            <p id="traffic-status" class="status" role="status" aria-live="polite"></p>
           </section>
         </div>
       </div>
