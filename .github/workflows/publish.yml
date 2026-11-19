@@ -46,6 +46,7 @@ jobs:
           node --check portal/static/login.js
           node --check portal/static/settings.js
           node --check portal/static/navigation.js
+          node --check portal/static/analytics.js
       - name: Run API and decryption tests
         run: python -m pytest -q
       - name: Check release tag matches VERSION

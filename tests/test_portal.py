@@ -29,6 +29,7 @@ DOCUMENT = (b'#!RXPTOOL/1\n'
 def load(role, tmp_path, monkeypatch):
     monkeypatch.setenv("RXP_PORTAL_ROLE", role)
     monkeypatch.setenv("RXP_PORTAL_DB", str(tmp_path / "data.db"))
+    monkeypatch.setenv("RXP_PORTAL_ANALYTICS_DB", str(tmp_path / "telemetry" / "traffic.sqlite3"))
     monkeypatch.setenv("RXP_PORTAL_ADMIN_USER", "administrator")
     monkeypatch.setenv("RXP_PORTAL_ADMIN_PASSWORD", "a-very-strong-private-test-password")
     import portal.entry
@@ -598,3 +599,134 @@ def test_approved_accounts_list_scrolls_independently(tmp_path, monkeypatch):
     with TestClient(public.app) as client:
         assert client.get("/api/state").status_code == 404
         assert 'id="ids"' not in client.get("/download").text
+
+
+
+def test_public_analytics_tracks_visits_downloads_and_unapproved_ids_privately(tmp_path, monkeypatch):
+    analytics_db = tmp_path / "telemetry" / "traffic.sqlite3"
+    admin = load("admin", tmp_path, monkeypatch)
+    with TestClient(admin.app) as c:
+        assert c.get("/api/analytics").status_code == 401
+        headers = sign_in(c)
+        assert c.get("/api/analytics").json()["available"] is False
+        assert c.post("/api/allowlist/add", json={"battle_id": "Trusted#1234"},
+                      headers=headers).status_code == 200
+        assert c.post("/api/publish", content=DOCUMENT,
+                      headers={**headers, "Content-Type": "application/octet-stream"}).status_code == 200
+        page = c.get("/admin/publish")
+        assert 'id="unapproved-ids"' in page.text
+        assert 'id="traffic-stats"' in page.text
+        assert '<script src="/assets/analytics.js" defer></script>' in page.text
+        assert c.get("/assets/analytics.js").status_code == 200
+
+    analytics_db.parent.mkdir(parents=True, exist_ok=True)  # Simulates the Docker volume mount.
+    public = load("public", tmp_path, monkeypatch)
+    with TestClient(public.app) as c:
+        assert c.get("/api/analytics").status_code == 404
+        assert c.get("/assets/analytics.js").status_code == 404
+        assert c.get("/download", headers={
+            "Referer": "https://discord.com/channels/private-community/invite?secret=123"
+        }).status_code == 200
+        assert c.get("/download", headers={
+            "Referer": "https://discord.com/another-path"
+        }).status_code == 200
+        assert c.get("/download", headers={
+            "Referer": "javascript:alert(1)"
+        }).status_code == 200
+
+        for entered in ("Unknown#1234", "UNKNOWN#1234", "Another#4567"):
+            bad = c.post("/api/download", json={"battle_id": entered})
+            assert bad.status_code == 404, bad.text
+        good = c.post("/api/download", json={"battle_id": "Trusted#1234"})
+        assert good.status_code == 200, good.text
+        assert c.post("/api/download", json={"battle_id": "invalid"}).status_code == 400
+
+    assert analytics_db.exists()
+    with sqlite3.connect(analytics_db) as db:
+        referrers = db.execute("SELECT hostname,views FROM referrers").fetchall()
+        assert referrers == [("discord.com", 2)]
+        assert db.execute("SELECT COUNT(*) FROM unapproved").fetchone()[0] == 2
+        assert db.execute("SELECT COUNT(*) FROM daily").fetchone()[0] == 1
+    with sqlite3.connect(analytics_db) as plain_reader:
+        # The limit is a write-connection setting, not a DB-wide metadata field.
+        assert plain_reader.execute("SELECT COUNT(*) FROM daily").fetchone()[0] == 1
+    from portal import analytics as metrics
+    with metrics._open_write(analytics_db) as capped_writer:
+        assert capped_writer.execute("PRAGMA max_page_count").fetchone()[0] <= 2048
+        assert "private-community" not in str(referrers)
+
+    admin = load("admin", tmp_path, monkeypatch)
+    with TestClient(admin.app) as c:
+        sign_in(c)
+        stats = c.get("/api/analytics").json()
+        assert stats["available"] is True
+        assert stats["today"] == {"views": 3, "requests": 4, "successes": 1, "denials": 3}
+        assert stats["week"] == stats["today"]
+        assert stats["month"] == stats["today"]
+        assert len(stats["unapproved"]) == 2
+        by_id = {item["battle_id"].casefold(): item for item in stats["unapproved"]}
+        assert by_id["unknown#1234"]["attempts"] == 2
+        assert by_id["another#4567"]["attempts"] == 1
+        assert "Trusted#1234" not in str(stats["unapproved"])
+        assert stats["referrers"] == [{"hostname": "discord.com", "views": 2}]
+
+        # Newly approved IDs no longer appear in the outstanding list.
+        assert c.post("/api/allowlist/add", json={"battle_id": "Unknown#1234"},
+                      headers={"X-RXP-Admin": "1"}).status_code == 200
+        after = c.get("/api/analytics").json()
+        assert len(after["unapproved"]) == 1
+        assert after["unapproved"][0]["battle_id"] == "Another#4567"
+        assert after["month"]["denials"] == 3  # historic attempts still count
+
+
+def test_analytics_retention_caps_and_resilience(tmp_path, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    from portal import analytics as metrics
+
+    path = tmp_path / "separate-traffic.sqlite3"
+    metrics.initialize(path)
+    monkeypatch.setattr(metrics, "MAX_UNAPPROVED_IDS", 2)
+    metrics.record_download(path, outcome="denied", battle_id="First#1000")
+    metrics.record_download(path, outcome="denied", battle_id="Second#1001")
+    metrics.record_download(path, outcome="denied", battle_id="Third#1002")
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT COUNT(*) FROM unapproved").fetchone()[0] == 2
+        old_day = (datetime.now(timezone.utc).date() - timedelta(days=100)).isoformat()
+        db.execute("INSERT INTO daily(day,views) VALUES (?,19)", (old_day,))
+    metrics.record_pageview(path, referer="https://reddit.com/r/something?private=1")
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT COUNT(*) FROM daily WHERE day=?", (old_day,)).fetchone()[0] == 0
+        assert db.execute("SELECT hostname FROM referrers").fetchone()[0] == "reddit.com"
+    assert metrics.referrer_hostname("https://example.com/secret?x=1", "another.site") == "example.com"
+    assert metrics.referrer_hostname("https://site.example.local/foo", "site.example.local") is None
+    assert metrics.referrer_hostname("javascript:alert(1)", "site.example") is None
+    assert metrics.referrer_hostname("https://u:p@example.com/path", "site.example") == "example.com"
+
+    # Telemetry failures must not prevent existing guide downloads.
+    admin = load("admin", tmp_path, monkeypatch)
+    with TestClient(admin.app) as c:
+        sign_in(c)
+        assert c.post("/api/allowlist/add", json={"battle_id": "Works#1234"},
+                      headers={"X-RXP-Admin": "1"}).status_code == 200
+        assert c.post("/api/publish", content=DOCUMENT,
+                      headers={"X-RXP-Admin": "1", "Content-Type": "application/octet-stream"}).status_code == 200
+
+    (tmp_path / "telemetry").mkdir(exist_ok=True)
+    public = load("public", tmp_path, monkeypatch)
+    def broken(*args, **kwargs):
+        raise sqlite3.OperationalError("disk full")
+    monkeypatch.setattr(metrics, "record_pageview", broken)
+    monkeypatch.setattr(metrics, "record_download", broken)
+    with TestClient(public.app) as c:
+        assert c.get("/download").status_code == 200
+        assert c.post("/api/download", json={"battle_id": "Works#1234"}).status_code == 200
+
+
+def test_analytics_compose_has_persistent_isolated_volume():
+    stack = (Path(__file__).resolve().parents[1] / "portainer-portal-stack.yml").read_text()
+    assert "name: rxptool_portal_data" in stack
+    assert "name: rxptool_analytics_data" in stack
+    assert "- analytics_data:/telemetry:ro" in stack
+    assert "- analytics_data:/telemetry" in stack
+    assert "- portal_data:/data:ro" in stack
+    assert "networks: [proxy]" in stack
