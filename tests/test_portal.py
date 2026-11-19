@@ -647,7 +647,12 @@ def test_public_analytics_tracks_visits_downloads_and_unapproved_ids_privately(t
         assert referrers == [("discord.com", 2)]
         assert db.execute("SELECT COUNT(*) FROM unapproved").fetchone()[0] == 2
         assert db.execute("SELECT COUNT(*) FROM daily").fetchone()[0] == 1
-        assert db.execute("PRAGMA max_page_count").fetchone()[0] <= 2048
+    with sqlite3.connect(analytics_db) as plain_reader:
+        # The limit is a write-connection setting, not a DB-wide metadata field.
+        assert plain_reader.execute("SELECT COUNT(*) FROM daily").fetchone()[0] == 1
+    from portal import analytics as metrics
+    with metrics._open_write(analytics_db) as capped_writer:
+        assert capped_writer.execute("PRAGMA max_page_count").fetchone()[0] <= 2048
         assert "private-community" not in str(referrers)
 
     admin = load("admin", tmp_path, monkeypatch)
