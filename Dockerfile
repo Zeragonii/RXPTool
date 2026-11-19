@@ -9,7 +9,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
     groupadd --gid 10001 app && \
     useradd --uid 10001 --gid 10001 --home-dir /nonexistent --no-create-home app && \
-    mkdir -p /data && chown 10001:10001 /data && chmod 0700 /data
+    mkdir -p /data /telemetry && chown 10001:10001 /data /telemetry && chmod 0700 /data /telemetry
 
 COPY rxp_decrypt.py ./rxp_decrypt.py
 COPY webapp ./webapp
