@@ -61,6 +61,8 @@ def initialize(db_path: Path) -> None:
 def _open_write(path: Path):
     db = sqlite3.connect(path, timeout=3)
     db.execute("PRAGMA busy_timeout=3000")
+    # max_page_count is connection-local; enforce the cap on every writer.
+    db.execute("PRAGMA max_page_count=" + str(MAX_DB_PAGES))
     return db
 
 
