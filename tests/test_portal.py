@@ -619,6 +619,7 @@ def test_public_analytics_tracks_visits_downloads_and_unapproved_ids_privately(t
         assert '<script src="/assets/analytics.js" defer></script>' in page.text
         assert c.get("/assets/analytics.js").status_code == 200
 
+    analytics_db.parent.mkdir(parents=True, exist_ok=True)  # Simulates the Docker volume mount.
     public = load("public", tmp_path, monkeypatch)
     with TestClient(public.app) as c:
         assert c.get("/api/analytics").status_code == 404
@@ -705,6 +706,7 @@ def test_analytics_retention_caps_and_resilience(tmp_path, monkeypatch):
         assert c.post("/api/publish", content=DOCUMENT,
                       headers={"X-RXP-Admin": "1", "Content-Type": "application/octet-stream"}).status_code == 200
 
+    (tmp_path / "telemetry").mkdir(exist_ok=True)
     public = load("public", tmp_path, monkeypatch)
     def broken(*args, **kwargs):
         raise sqlite3.OperationalError("disk full")
