@@ -625,6 +625,10 @@ if ROLE == "admin":
     def navigation_script():
         return FileResponse(STATIC / "navigation.js", media_type="application/javascript")
 
+    @app.get("/assets/analytics.js")
+    def analytics_script():
+        return FileResponse(STATIC / "analytics.js", media_type="application/javascript")
+
     @app.get("/api/state")
     def admin_state():
         return state()
