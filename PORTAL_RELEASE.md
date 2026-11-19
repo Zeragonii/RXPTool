@@ -84,3 +84,26 @@ This is a stylesheet and HTML-only update, using no external assets, inline scri
 ## Classic favicon on the private admin UI
 
 The publishing dashboard and login page now use the **original Decrypt/Encrypt site favicon assets** (SVG, 32px PNG, ICO, and Apple touch icon) shipped in the same Docker image. These assets are served by the admin role even before login so browsers can display the icon on the sign-in page; no editor API or admin functionality is exposed. The admin role's CSP explicitly permits same-origin image requests (`img-src 'self'`) but still denies external sources and inline scripts. The public downloads role continues using the separate Bloodsail pirate SVG favicon. No extra configuration is necessary.
+
+## Private download telemetry and unapproved Battle.net IDs
+
+The private publisher dashboard includes a **Download activity** panel (UTC page views today/last 7 days/last 30 days; valid processed requests, successful downloads, and denied requests in the last 30 days), a bounded 90-day recent daily activity view, and a **Unknown Battle.net IDs** list with attempt count, first seen, and last seen. Once a currently unknown ID is allowlisted, it disappears from that list, while the historical denied-attempt total remains. Browser-supplied referring website hostnames (not paths/query strings) are shown for the last 30 days when available; referrers can be absent, spoofed, or stripped, so they are weak evidence of referral communities. Page views count requests, **not distinct visitors**, and may include bots or page refreshes. Requests that fail validation or are rate-limited before account checks are not counted as processed download requests. Telemetry begins only after deployment (no retrospective logs).
+
+### Required Compose update
+
+**Use the latest `portainer-portal-stack.yml` from GitHub as the Portainer stack definition**, not just the newest image. It adds a second named volume, `rxptool_analytics_data`, shared as `/telemetry` with these mounts:
+
+- `rxptool-download`: `analytics_data:/telemetry` (write to telemetry only; publishing database remains `portal_data:/data:ro`)
+- `rxptool-publisher`: `analytics_data:/telemetry:ro` (read private telemetry, no writing)
+
+Both services use `RXP_PORTAL_ANALYTICS_DB=/telemetry/traffic.sqlite3`. The telemetry volume is automatically initialized by the image with permissions for the existing non-root container user. All existing network configuration, containers and publication data remain unchanged. `rxptool-publisher` remains **off** the NPM proxy network. A fresh named volume will appear in Portainer; **do not remove `rxptool_portal_data`**.
+
+If the updated image is deployed with an *old* Compose file that lacks the telemetry mount, downloads remain operational but tracking is disabled and the admin UI says unavailable. Updating the stack definition and redeploying enables it.
+
+### Retention, limits and security
+
+- Only the public service may write the **separate telemetry SQLite file**. The admin role exposes read-only `GET /api/analytics` protected by the existing private session authentication. The public role has no admin analytics endpoint, no editor endpoints and no access to admin credentials.
+- Records are kept for **up to 90 days**, pruned during subsequent traffic; at most **1,000 distinct unapproved IDs** are retained. If that limit is reached, the least-recently-seen ID is evicted; aggregate daily counters continue.
+- Referring hostnames are recorded only when an HTTP(S) `Referer` is supplied; never the referring URL path, query string, or fragment. At most 40 distinct referrer hosts per UTC day are counted. Full IP addresses, user agents, and successful approved Battle.net IDs are **not stored** in the telemetry database.
+- A SQLite page cap restricts the telemetry DB to about 8 MiB under SQLite's default page size; SQLite rollback-journal file overhead may add temporary disk use. Telemetry errors must **not** interrupt user downloads. Admin and downloader remain on the original locked-down security headers and roles.
+- The public page includes a short disclosure of this tracking. This is an operational access-monitoring tool, not identity verification or proof that specific people have shared the site.
